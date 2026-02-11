@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.specqq.chatbot.mapper.HandlerChainMapper">
+
+    <!-- Select: selectByRuleIdOrdered -->
+    <select id="selectByRuleIdOrdered" resultType="com.specqq.chatbot.entity.HandlerChain">
+        SELECT
+            id,
+            rule_id,
+            handler_type,
+            handler_config,
+            sequence_order,
+            enabled,
+            create_time,
+            update_time
+        FROM handler_chain
+        WHERE rule_id = #{ruleId}
+          AND enabled = TRUE
+        ORDER BY sequence_order ASC
+    </select>
+
+</mapper>

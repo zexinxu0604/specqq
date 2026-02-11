@@ -44,9 +44,12 @@ public class CacheConfig {
 
         // 设置缓存名称
         cacheManager.setCacheNames(java.util.Arrays.asList(
-            "rules",           // 规则缓存
+            "rules",            // 规则缓存
             "compiledPatterns", // 编译后的正则表达式缓存
-            "groupRules"       // 群规则列表缓存
+            "groupRules",       // 群规则列表缓存
+            "ruleGroupCache",   // 规则-群组缓存 (新增)
+            "handlerMetadata",  // Handler 元数据缓存 (新增)
+            "userRoles"         // 用户角色缓存 (新增)
         ));
 
         // 默认缓存配置

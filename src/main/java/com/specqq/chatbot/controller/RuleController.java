@@ -3,8 +3,13 @@ package com.specqq.chatbot.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.specqq.chatbot.common.Result;
 import com.specqq.chatbot.common.ResultCode;
+import com.specqq.chatbot.dto.RuleCreateDTO;
+import com.specqq.chatbot.dto.RuleUpdateDTO;
 import com.specqq.chatbot.entity.MessageRule;
+import com.specqq.chatbot.entity.RulePolicy;
+import com.specqq.chatbot.service.PolicyService;
 import com.specqq.chatbot.service.RuleService;
+import com.specqq.chatbot.vo.RuleDetailVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -28,6 +33,7 @@ import org.springframework.web.bind.annotation.*;
 public class RuleController {
 
     private final RuleService ruleService;
+    private final PolicyService policyService;
 
     /**
      * 分页查询规则列表
@@ -295,5 +301,248 @@ public class RuleController {
         result.put("unique", !exists);
 
         return Result.success(result);
+    }
+
+    /**
+     * 创建规则（新版，支持策略）
+     */
+    @PostMapping("/v2")
+    @Operation(summary = "创建规则（V2）", description = "创建新的消息匹配规则，支持策略配置")
+    public Result<RuleDetailVO> createRuleV2(
+        @Valid @RequestBody RuleCreateDTO dto
+    ) {
+        log.info("创建规则 V2: ruleName={}, priority={}", dto.getRuleName(), dto.getPriority());
+
+        // 验证规则名称唯一性
+        if (ruleService.existsByName(dto.getRuleName())) {
+            return Result.error(ResultCode.RULE_NAME_DUPLICATE);
+        }
+
+        // 构建规则实体
+        MessageRule rule = new MessageRule();
+        rule.setName(dto.getRuleName());
+        rule.setDescription(dto.getDescription());
+        rule.setMatchType(convertToEntityMatchType(dto.getMatchType()));
+        rule.setPattern(dto.getPattern());
+        rule.setPriority(dto.getPriority());
+        rule.setHandlerConfig(dto.getHandlerConfig());
+        rule.setOnErrorPolicy(dto.getOnErrorPolicy());
+        rule.setEnabled(dto.getEnabled());
+
+        // 验证正则表达式
+        if (MessageRule.MatchType.REGEX.equals(dto.getMatchType())) {
+            if (!ruleService.validateRegexPattern(dto.getPattern())) {
+                return Result.error(ResultCode.RULE_PATTERN_INVALID, "正则表达式语法错误");
+            }
+        }
+
+        // 构建策略实体
+        RulePolicy policy = null;
+        if (dto.getPolicy() != null) {
+            policy = convertPolicyDTOToEntity(dto.getPolicy());
+        }
+
+        // 创建规则和策略
+        MessageRule created = ruleService.createRuleWithPolicy(rule, policy);
+
+        // 构建响应 VO
+        RuleDetailVO vo = buildRuleDetailVO(created, policy);
+
+        return Result.success("规则创建成功", vo);
+    }
+
+    /**
+     * 更新规则（新版，支持策略）
+     */
+    @PutMapping("/v2/{id}")
+    @Operation(summary = "更新规则（V2）", description = "更新现有规则，支持策略配置")
+    public Result<RuleDetailVO> updateRuleV2(
+        @Parameter(description = "规则ID") @PathVariable Long id,
+        @Valid @RequestBody RuleUpdateDTO dto
+    ) {
+        log.info("更新规则 V2: id={}, ruleName={}", id, dto.getRuleName());
+
+        // 检查规则是否存在
+        MessageRule existing = ruleService.getRuleById(id);
+        if (existing == null) {
+            return Result.error(ResultCode.RULE_NOT_FOUND);
+        }
+
+        // 验证规则名称唯一性（排除自身）
+        if (dto.getRuleName() != null && !existing.getName().equals(dto.getRuleName())) {
+            if (ruleService.existsByName(dto.getRuleName())) {
+                return Result.error(ResultCode.RULE_NAME_DUPLICATE);
+            }
+        }
+
+        // 更新规则字段（只更新提供的字段）
+        if (dto.getRuleName() != null) {
+            existing.setName(dto.getRuleName());
+        }
+        if (dto.getDescription() != null) {
+            existing.setDescription(dto.getDescription());
+        }
+        if (dto.getMatchType() != null) {
+            existing.setMatchType(convertToEntityMatchType(dto.getMatchType()));
+        }
+        if (dto.getPattern() != null) {
+            existing.setPattern(dto.getPattern());
+        }
+        if (dto.getPriority() != null) {
+            existing.setPriority(dto.getPriority());
+        }
+        if (dto.getHandlerConfig() != null) {
+            existing.setHandlerConfig(dto.getHandlerConfig());
+        }
+        if (dto.getOnErrorPolicy() != null) {
+            existing.setOnErrorPolicy(dto.getOnErrorPolicy());
+        }
+        if (dto.getEnabled() != null) {
+            existing.setEnabled(dto.getEnabled());
+        }
+
+        // 验证正则表达式
+        if (MessageRule.MatchType.REGEX.equals(existing.getMatchType())) {
+            if (!ruleService.validateRegexPattern(existing.getPattern())) {
+                return Result.error(ResultCode.RULE_PATTERN_INVALID, "正则表达式语法错误");
+            }
+        }
+
+        // 构建策略实体
+        RulePolicy policy = null;
+        if (dto.getPolicy() != null) {
+            policy = convertUpdatePolicyDTOToEntity(dto.getPolicy());
+        }
+
+        // 更新规则和策略
+        MessageRule updated = ruleService.updateRuleWithPolicy(existing, policy);
+
+        // 构建响应 VO
+        RulePolicy updatedPolicy = policyService.getPolicyByRuleId(id);
+        RuleDetailVO vo = buildRuleDetailVO(updated, updatedPolicy);
+
+        return Result.success("规则更新成功", vo);
+    }
+
+    /**
+     * 获取规则详情（新版，包含策略）
+     */
+    @GetMapping("/v2/{id}")
+    @Operation(summary = "查询规则详情（V2）", description = "根据规则ID查询详细信息，包含策略配置")
+    public Result<RuleDetailVO> getRuleDetailV2(
+        @Parameter(description = "规则ID") @PathVariable Long id
+    ) {
+        log.info("查询规则详情 V2: id={}", id);
+
+        RuleService.RuleWithPolicy ruleWithPolicy = ruleService.getRuleWithPolicy(id);
+        if (ruleWithPolicy == null || ruleWithPolicy.rule() == null) {
+            return Result.error(ResultCode.RULE_NOT_FOUND);
+        }
+
+        RuleDetailVO vo = buildRuleDetailVO(ruleWithPolicy.rule(), ruleWithPolicy.policy());
+        return Result.success(vo);
+    }
+
+    /**
+     * 将 PolicyDTO 转换为实体
+     */
+    private RulePolicy convertPolicyDTOToEntity(RuleCreateDTO.PolicyDTO dto) {
+        RulePolicy policy = new RulePolicy();
+        policy.setScope(dto.getScope());
+        policy.setWhitelist(dto.getWhitelist());
+        policy.setBlacklist(dto.getBlacklist());
+        policy.setRateLimitEnabled(dto.getRateLimitEnabled());
+        policy.setRateLimitMaxRequests(dto.getRateLimitMaxRequests());
+        policy.setRateLimitWindowSeconds(dto.getRateLimitWindowSeconds());
+        policy.setTimeWindowEnabled(dto.getTimeWindowEnabled());
+        policy.setTimeWindowStart(dto.getTimeWindowStart() != null ? java.time.LocalTime.parse(dto.getTimeWindowStart()) : null);
+        policy.setTimeWindowEnd(dto.getTimeWindowEnd() != null ? java.time.LocalTime.parse(dto.getTimeWindowEnd()) : null);
+        policy.setTimeWindowWeekdays(dto.getTimeWindowWeekdays());
+        policy.setRoleEnabled(dto.getRoleEnabled());
+        policy.setAllowedRoles(dto.getAllowedRoles());
+        policy.setCooldownEnabled(dto.getCooldownEnabled());
+        policy.setCooldownSeconds(dto.getCooldownSeconds());
+        return policy;
+    }
+
+    /**
+     * 构建 RuleDetailVO
+     */
+    private RuleDetailVO buildRuleDetailVO(MessageRule rule, RulePolicy policy) {
+        // 转换 MatchType
+        com.specqq.chatbot.common.enums.MatchType matchType = null;
+        if (rule.getMatchType() != null) {
+            matchType = com.specqq.chatbot.common.enums.MatchType.valueOf(rule.getMatchType().name());
+        }
+
+        RuleDetailVO.RuleDetailVOBuilder builder = RuleDetailVO.builder()
+                .id(rule.getId())
+                .ruleName(rule.getName())
+                .description(rule.getDescription())
+                .matchType(matchType)
+                .pattern(rule.getPattern())
+                .priority(rule.getPriority())
+                .handlerConfig(rule.getHandlerConfig())
+                .onErrorPolicy(rule.getOnErrorPolicy())
+                .enabled(rule.getEnabled())
+                .createBy(rule.getCreateBy())
+                .createTime(rule.getCreateTime())
+                .updateBy(rule.getUpdateBy())
+                .updateTime(rule.getUpdateTime());
+
+        // 添加策略信息
+        if (policy != null) {
+            RuleDetailVO.PolicyVO policyVO = RuleDetailVO.PolicyVO.builder()
+                    .scope(policy.getScope())
+                    .whitelist(policy.getWhitelist())
+                    .blacklist(policy.getBlacklist())
+                    .rateLimitEnabled(policy.getRateLimitEnabled())
+                    .rateLimitMaxRequests(policy.getRateLimitMaxRequests())
+                    .rateLimitWindowSeconds(policy.getRateLimitWindowSeconds())
+                    .timeWindowEnabled(policy.getTimeWindowEnabled())
+                    .timeWindowStart(policy.getTimeWindowStart() != null ? policy.getTimeWindowStart().toString() : null)
+                    .timeWindowEnd(policy.getTimeWindowEnd() != null ? policy.getTimeWindowEnd().toString() : null)
+                    .timeWindowWeekdays(policy.getTimeWindowWeekdays())
+                    .roleEnabled(policy.getRoleEnabled())
+                    .allowedRoles(policy.getAllowedRoles())
+                    .cooldownEnabled(policy.getCooldownEnabled())
+                    .cooldownSeconds(policy.getCooldownSeconds())
+                    .build();
+            builder.policy(policyVO);
+        }
+
+        return builder.build();
+    }
+
+    /**
+     * 将 RuleUpdateDTO.PolicyDTO 转换为实体
+     */
+    private RulePolicy convertUpdatePolicyDTOToEntity(RuleUpdateDTO.PolicyDTO dto) {
+        RulePolicy policy = new RulePolicy();
+        policy.setScope(dto.getScope());
+        policy.setWhitelist(dto.getWhitelist());
+        policy.setBlacklist(dto.getBlacklist());
+        policy.setRateLimitEnabled(dto.getRateLimitEnabled());
+        policy.setRateLimitMaxRequests(dto.getRateLimitMaxRequests());
+        policy.setRateLimitWindowSeconds(dto.getRateLimitWindowSeconds());
+        policy.setTimeWindowEnabled(dto.getTimeWindowEnabled());
+        policy.setTimeWindowStart(dto.getTimeWindowStart() != null ? java.time.LocalTime.parse(dto.getTimeWindowStart()) : null);
+        policy.setTimeWindowEnd(dto.getTimeWindowEnd() != null ? java.time.LocalTime.parse(dto.getTimeWindowEnd()) : null);
+        policy.setTimeWindowWeekdays(dto.getTimeWindowWeekdays());
+        policy.setRoleEnabled(dto.getRoleEnabled());
+        policy.setAllowedRoles(dto.getAllowedRoles());
+        policy.setCooldownEnabled(dto.getCooldownEnabled());
+        policy.setCooldownSeconds(dto.getCooldownSeconds());
+        return policy;
+    }
+
+    /**
+     * 转换 MatchType 从 DTO 到 Entity
+     */
+    private MessageRule.MatchType convertToEntityMatchType(com.specqq.chatbot.common.enums.MatchType dtoMatchType) {
+        if (dtoMatchType == null) {
+            return null;
+        }
+        return MessageRule.MatchType.valueOf(dtoMatchType.name());
     }
 }

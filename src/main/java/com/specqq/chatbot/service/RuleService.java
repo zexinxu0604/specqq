@@ -40,6 +40,7 @@ public class RuleService extends ServiceImpl<MessageRuleMapper, MessageRule> {
     private final ContainsMatcher containsMatcher;
     private final RegexMatcher regexMatcher;
     private final StatisticsMatcher statisticsMatcher;
+    private final PolicyService policyService;
 
     /**
      * 查询群聊启用的规则列表(按优先级排序)
@@ -172,7 +173,7 @@ public class RuleService extends ServiceImpl<MessageRuleMapper, MessageRule> {
         }
 
         wrapper.orderByDesc(MessageRule::getPriority)
-            .orderByDesc(MessageRule::getCreatedAt);
+            .orderByDesc(MessageRule::getCreateTime);
 
         return messageRuleMapper.selectPage(page, wrapper);
     }
@@ -209,7 +210,7 @@ public class RuleService extends ServiceImpl<MessageRuleMapper, MessageRule> {
         }
 
         wrapper.orderByDesc(MessageRule::getPriority)
-            .orderByDesc(MessageRule::getCreatedAt);
+            .orderByDesc(MessageRule::getCreateTime);
 
         return messageRuleMapper.selectPage(pageParam, wrapper);
     }
@@ -325,8 +326,82 @@ public class RuleService extends ServiceImpl<MessageRuleMapper, MessageRule> {
             case CONTAINS -> containsMatcher;
             case REGEX -> regexMatcher;
             case STATISTICS -> statisticsMatcher;
+            case PREFIX, SUFFIX -> regexMatcher; // PREFIX and SUFFIX use regex matcher
         };
 
         return matcher.matches(message, pattern);
+    }
+
+    /**
+     * 创建规则（带策略）
+     *
+     * @param rule   规则对象
+     * @param policy 策略对象（可选）
+     * @return 创建的规则
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public MessageRule createRuleWithPolicy(MessageRule rule, com.specqq.chatbot.entity.RulePolicy policy) {
+        // 创建规则
+        MessageRule created = createRule(rule);
+
+        // 如果提供了策略，创建策略
+        if (policy != null) {
+            policy.setRuleId(created.getId());
+            String validationError = policyService.validatePolicy(policy);
+            if (validationError != null) {
+                throw new IllegalArgumentException("策略配置无效: " + validationError);
+            }
+            policyService.createPolicy(policy);
+        }
+
+        return created;
+    }
+
+    /**
+     * 更新规则（带策略）
+     *
+     * @param rule   规则对象
+     * @param policy 策略对象（可选）
+     * @return 更新的规则
+     */
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "groupRules", allEntries = true, cacheManager = "caffeineCacheManager")
+    public MessageRule updateRuleWithPolicy(MessageRule rule, com.specqq.chatbot.entity.RulePolicy policy) {
+        // 更新规则
+        MessageRule updated = updateRule(rule);
+
+        // 如果提供了策略，创建或更新策略
+        if (policy != null) {
+            policy.setRuleId(updated.getId());
+            String validationError = policyService.validatePolicy(policy);
+            if (validationError != null) {
+                throw new IllegalArgumentException("策略配置无效: " + validationError);
+            }
+            policyService.saveOrUpdatePolicy(policy);
+        }
+
+        return updated;
+    }
+
+    /**
+     * 获取规则详情（包含策略）
+     *
+     * @param ruleId 规则 ID
+     * @return 规则对象和策略
+     */
+    public RuleWithPolicy getRuleWithPolicy(Long ruleId) {
+        MessageRule rule = messageRuleMapper.selectById(ruleId);
+        if (rule == null) {
+            return null;
+        }
+
+        com.specqq.chatbot.entity.RulePolicy policy = policyService.getPolicyByRuleId(ruleId);
+        return new RuleWithPolicy(rule, policy);
+    }
+
+    /**
+     * 规则和策略的组合对象
+     */
+    public record RuleWithPolicy(MessageRule rule, com.specqq.chatbot.entity.RulePolicy policy) {
     }
 }

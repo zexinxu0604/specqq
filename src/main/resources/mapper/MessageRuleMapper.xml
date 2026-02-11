@@ -11,8 +11,13 @@
             r.match_type,
             r.pattern,
             r.response_template,
+            r.handler_config,
+            r.on_error_policy,
             r.priority,
             r.enabled,
+            r.deleted,
+            r.create_by,
+            r.update_by,
             r.created_by,
             r.created_at,
             r.updated_at
@@ -20,8 +25,9 @@
         INNER JOIN group_rule_config grc ON r.id = grc.rule_id
         WHERE grc.group_id = #{groupId}
           AND r.enabled = TRUE
+          AND r.deleted = FALSE
           AND grc.enabled = TRUE
-        ORDER BY r.priority DESC, r.created_at ASC
+        ORDER BY r.priority ASC, r.id ASC
     </select>
 
 </mapper>
