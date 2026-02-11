@@ -86,6 +86,12 @@
             <artifactId>spring-boot-starter-actuator</artifactId>
         </dependency>
 
+        <!-- AspectJ for Rate Limiting (T116) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-aop</artifactId>
+        </dependency>
+
         <!-- Micrometer Prometheus Registry -->
         <dependency>
             <groupId>io.micrometer</groupId>

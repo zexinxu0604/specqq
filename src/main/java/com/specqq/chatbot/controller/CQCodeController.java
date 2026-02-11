@@ -1,5 +1,6 @@
 package com.specqq.chatbot.controller;
 
+import com.specqq.chatbot.common.RateLimit;
 import com.specqq.chatbot.common.Result;
 import com.specqq.chatbot.dto.ParseCQCodeRequestDTO;
 import com.specqq.chatbot.dto.StripCQCodeRequestDTO;
@@ -47,10 +48,13 @@ public class CQCodeController {
      *
      * <p>POST /api/cqcode/parse</p>
      *
+     * <p>Rate limit: 100 requests per minute per IP (T116)</p>
+     *
      * @param request Parse request with message content
      * @return List of parsed CQ codes
      */
     @PostMapping("/parse")
+    @RateLimit(limit = 100, windowSeconds = 60)
     public Result<List<CQCodeVO>> parseCQCodes(@Valid @RequestBody ParseCQCodeRequestDTO request) {
         try {
             List<CQCode> cqCodes = cqCodeParser.parse(request.getMessage());
@@ -71,10 +75,13 @@ public class CQCodeController {
      *
      * <p>POST /api/cqcode/strip</p>
      *
+     * <p>Rate limit: 100 requests per minute per IP (T116)</p>
+     *
      * @param request Strip request with message content
      * @return Plain text and character count
      */
     @PostMapping("/strip")
+    @RateLimit(limit = 100, windowSeconds = 60)
     public Result<Map<String, Object>> stripCQCodes(@Valid @RequestBody StripCQCodeRequestDTO request) {
         try {
             String plainText = cqCodeParser.stripCQCodes(request.getMessage());
@@ -96,10 +103,13 @@ public class CQCodeController {
      *
      * <p>POST /api/cqcode/validate</p>
      *
+     * <p>Rate limit: 100 requests per minute per IP (T116)</p>
+     *
      * @param request Validate request with CQ code string
      * @return Validation result
      */
     @PostMapping("/validate")
+    @RateLimit(limit = 100, windowSeconds = 60)
     public Result<Map<String, Object>> validateCQCode(@Valid @RequestBody ValidateCQCodeRequestDTO request) {
         try {
             CQCodeParser.ValidationResult validation = cqCodeParser.validate(request.getCqCode());
@@ -120,9 +130,12 @@ public class CQCodeController {
      *
      * <p>GET /api/cqcode/types</p>
      *
+     * <p>Rate limit: 100 requests per minute per IP (T116)</p>
+     *
      * @return List of CQ code types
      */
     @GetMapping("/types")
+    @RateLimit(limit = 100, windowSeconds = 60)
     public Result<List<Map<String, String>>> getCQCodeTypes() {
         try {
             List<Map<String, String>> types = Arrays.stream(CQCodeType.values())
@@ -168,9 +181,12 @@ public class CQCodeController {
      *
      * <p>GET /api/cqcode/patterns</p>
      *
+     * <p>Rate limit: 100 requests per minute per IP (T116)</p>
+     *
      * @return List of predefined patterns
      */
     @GetMapping("/patterns")
+    @RateLimit(limit = 100, windowSeconds = 60)
     public Result<List<CQCodePatternDTO>> getPredefinedPatterns() {
         try {
             List<CQCodePatternDTO> patterns = cqCodeService.listPredefinedPatterns();
@@ -186,10 +202,13 @@ public class CQCodeController {
      *
      * <p>POST /api/cqcode/patterns/validate</p>
      *
+     * <p>Rate limit: 100 requests per minute per IP (T116)</p>
+     *
      * @param request Request with regex pattern to validate
      * @return Validation result
      */
     @PostMapping("/patterns/validate")
+    @RateLimit(limit = 100, windowSeconds = 60)
     public Result<Map<String, Object>> validatePattern(@Valid @RequestBody ValidateCQCodeRequestDTO request) {
         try {
             boolean isValid = cqCodeService.validatePattern(request.getCqCode());

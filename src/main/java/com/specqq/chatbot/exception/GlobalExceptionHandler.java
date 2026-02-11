@@ -157,6 +157,28 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * 处理业务异常 (429 - Too Many Requests for rate limiting, 400 for other business errors)
+     *
+     * <p>T116: Handle BusinessException for rate limiting and other business logic violations.</p>
+     */
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<Result<Void>> handleBusinessException(BusinessException ex) {
+        log.warn("业务异常: {}", ex.getMessage());
+
+        // If it's a rate limit exception, return 429
+        if (ex.getMessage() != null && ex.getMessage().contains("Rate limit exceeded")) {
+            return ResponseEntity
+                .status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(Result.error(ResultCode.TOO_MANY_REQUESTS, ex.getMessage()));
+        }
+
+        // For other business exceptions, return 400
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(Result.error(ResultCode.BAD_REQUEST, ex.getMessage()));
+    }
+
+    /**
      * 处理运行时异常 (500)
      */
     @ExceptionHandler(RuntimeException.class)

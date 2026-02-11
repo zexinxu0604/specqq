@@ -1,5 +1,6 @@
 package com.specqq.chatbot.controller;
 
+import com.specqq.chatbot.common.RateLimit;
 import com.specqq.chatbot.common.Result;
 import com.specqq.chatbot.dto.CalculateStatisticsRequestDTO;
 import com.specqq.chatbot.dto.FormatStatisticsRequestDTO;
@@ -36,10 +37,13 @@ public class StatisticsController {
      *
      * <p>POST /api/statistics/calculate</p>
      *
+     * <p>Rate limit: 100 requests per minute per IP (T116)</p>
+     *
      * @param request Calculate request with message content
      * @return Message statistics
      */
     @PostMapping("/calculate")
+    @RateLimit(limit = 100, windowSeconds = 60)
     public Result<MessageStatisticsVO> calculateStatistics(@Valid @RequestBody CalculateStatisticsRequestDTO request) {
         try {
             MessageStatistics statistics = statisticsService.calculate(request.getMessage());
@@ -56,10 +60,13 @@ public class StatisticsController {
      *
      * <p>POST /api/statistics/format</p>
      *
+     * <p>Rate limit: 100 requests per minute per IP (T116)</p>
+     *
      * @param request Format request with statistics
      * @return Formatted Chinese statistics string
      */
     @PostMapping("/format")
+    @RateLimit(limit = 100, windowSeconds = 60)
     public Result<Map<String, String>> formatStatistics(@Valid @RequestBody FormatStatisticsRequestDTO request) {
         try {
             MessageStatistics statistics = new MessageStatistics(
@@ -84,10 +91,13 @@ public class StatisticsController {
      *
      * <p>POST /api/statistics/calculate-and-format</p>
      *
+     * <p>Rate limit: 100 requests per minute per IP (T116)</p>
+     *
      * @param request Calculate request with message content
      * @return Formatted Chinese statistics string
      */
     @PostMapping("/calculate-and-format")
+    @RateLimit(limit = 100, windowSeconds = 60)
     public Result<Map<String, String>> calculateAndFormat(@Valid @RequestBody CalculateStatisticsRequestDTO request) {
         try {
             String formatted = statisticsService.calculateAndFormat(request.getMessage());
@@ -107,10 +117,13 @@ public class StatisticsController {
      *
      * <p>POST /api/statistics/test</p>
      *
+     * <p>Rate limit: 100 requests per minute per IP (T116)</p>
+     *
      * @param request Test request with message content
      * @return Statistics with debug info (execution time, cache hit)
      */
     @PostMapping("/test")
+    @RateLimit(limit = 100, windowSeconds = 60)
     public Result<Map<String, Object>> testStatistics(@Valid @RequestBody TestStatisticsRequestDTO request) {
         try {
             long startTime = System.nanoTime();
