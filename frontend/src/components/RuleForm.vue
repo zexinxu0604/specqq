@@ -62,6 +62,27 @@
       </div>
     </el-form-item>
 
+    <!-- CQ Code Pattern Selector (only for REGEX type) -->
+    <el-form-item v-if="formData.matchType === MatchType.REGEX" label="CQ码模式">
+      <el-row :gutter="16">
+        <el-col :span="12">
+          <CQCodeSelector
+            v-model="selectedCQCodePattern"
+            @change="handleCQCodePatternChange"
+            @parameter-change="handleCQCodeParameterChange"
+          />
+        </el-col>
+        <el-col :span="12">
+          <CQCodePreview :pattern="selectedCQCodePatternObject" />
+        </el-col>
+      </el-row>
+      <div class="form-tip">
+        <el-text size="small" type="info">
+          选择预定义的CQ码模式，自动填充正则表达式
+        </el-text>
+      </div>
+    </el-form-item>
+
     <el-form-item label="回复模板" prop="replyTemplate">
       <el-input
         v-model="formData.replyTemplate"
@@ -143,6 +164,9 @@ import { CircleCheck, Promotion } from '@element-plus/icons-vue'
 import { validatePattern as validatePatternApi, testRuleMatch } from '@/api/modules/rule.api'
 import { MatchType, MatchTypeLabels } from '@/types/rule'
 import type { CreateRuleRequest, UpdateRuleRequest, TestRuleResponse, ValidatePatternResponse } from '@/types/rule'
+import CQCodeSelector from '@/components/CQCodeSelector.vue'
+import CQCodePreview from '@/components/CQCodePreview.vue'
+import type { CQCodePattern } from '@/types/cqcode'
 
 interface Props {
   modelValue: CreateRuleRequest | UpdateRuleRequest
@@ -177,6 +201,35 @@ const formData = reactive<CreateRuleRequest | UpdateRuleRequest>({
 watch(formData, (newVal) => {
   emit('update:modelValue', newVal)
 }, { deep: true })
+
+// CQ Code Pattern Selection
+const selectedCQCodePattern = ref<string | null>(null)
+const selectedCQCodePatternObject = ref<CQCodePattern | null>(null)
+
+// Handle CQ code pattern selection
+const handleCQCodePatternChange = (pattern: CQCodePattern | null) => {
+  selectedCQCodePatternObject.value = pattern
+
+  if (pattern) {
+    // Auto-fill the match pattern with the selected CQ code pattern
+    formData.matchPattern = pattern.pattern
+
+    // Auto-validate the pattern
+    patternValidation.value = {
+      valid: true,
+      message: `✓ 已应用预定义模式: ${pattern.label}`
+    }
+
+    ElMessage.success(`已应用CQ码模式: ${pattern.label}`)
+  }
+}
+
+// Handle CQ code parameter changes
+const handleCQCodeParameterChange = (params: Record<string, string>) => {
+  // Parameters are already handled by the pattern itself
+  // This is for future extensibility if we need to customize parameters
+  console.debug('CQ code parameters changed:', params)
+}
 
 // 优先级标记
 const priorityMarks = {
