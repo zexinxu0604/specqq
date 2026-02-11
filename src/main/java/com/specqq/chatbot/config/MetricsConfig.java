@@ -175,4 +175,70 @@ public class MetricsConfig {
             .tag("component", "database")
             .register(registry);
     }
+
+    /**
+     * T117: CQ code parsing metrics
+     */
+
+    /**
+     * CQ code parse count counter
+     */
+    @Bean
+    public Counter cqCodeParseCounter(MeterRegistry registry) {
+        return Counter.builder("cqcode_parse_total")
+            .description("CQ code parsing count")
+            .tag("component", "cqcode-parser")
+            .register(registry);
+    }
+
+    /**
+     * CQ code parse duration timer
+     */
+    @Bean
+    public Timer cqCodeParseDurationTimer(MeterRegistry registry) {
+        return Timer.builder("cqcode_parse_duration_seconds")
+            .description("CQ code parsing duration (seconds)")
+            .tag("component", "cqcode-parser")
+            .register(registry);
+    }
+
+    /**
+     * CQ code pattern cache hit counter
+     */
+    @Bean
+    public Counter cqCodeCacheHitsCounter(MeterRegistry registry) {
+        return Counter.builder("cqcode_cache_hits_total")
+            .description("CQ code pattern cache hits")
+            .tag("component", "cqcode-parser")
+            .tag("cache_type", "pattern")
+            .register(registry);
+    }
+
+    /**
+     * CQ code pattern cache miss counter
+     */
+    @Bean
+    public Counter cqCodeCacheMissesCounter(MeterRegistry registry) {
+        return Counter.builder("cqcode_cache_misses_total")
+            .description("CQ code pattern cache misses")
+            .tag("component", "cqcode-parser")
+            .tag("cache_type", "pattern")
+            .register(registry);
+    }
+
+    /**
+     * CQ code count gauge (total codes parsed)
+     */
+    @Bean
+    public AtomicInteger cqCodeTotalCount() {
+        return new AtomicInteger(0);
+    }
+
+    @Bean
+    public Gauge cqCodeTotalCountGauge(MeterRegistry registry, AtomicInteger cqCodeTotalCount) {
+        return Gauge.builder("cqcode_total_count", cqCodeTotalCount, AtomicInteger::get)
+            .description("Total CQ codes parsed")
+            .tag("component", "cqcode-parser")
+            .register(registry);
+    }
 }

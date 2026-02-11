@@ -271,10 +271,10 @@ Before proceeding to implementation tasks (T026-T056), you MUST:
 - [ ] T111 [P] Update API documentation in `specs/002-napcat-cqcode-parser/contracts/` (add examples, clarify response formats)
 - [ ] T112 [P] Update developer quickstart in `specs/002-napcat-cqcode-parser/quickstart.md` (add setup instructions, API examples)
 - [ ] T113 [P] Add SonarQube analysis for new code in `pom.xml` (ensure ≥80% coverage, no Critical issues)
-- [ ] T114 Code cleanup: Remove dead code, optimize imports, format code per Alibaba style guide
+- [x] T114 Code cleanup: Remove dead code, optimize imports, format code per Alibaba style guide
 - [ ] T115 Performance optimization: Profile CQ code parsing, optimize regex cache hit rate to ≥95%
 - [ ] T116 Security hardening: Add rate limiting for all new API endpoints (100 requests/minute/IP)
-- [ ] T117 [P] Add Prometheus metrics for CQ code parsing in `src/main/java/com/specqq/chatbot/config/MetricsConfig.java` (parse count, cache hit rate, execution time)
+- [x] T117 [P] Add Prometheus metrics for CQ code parsing in `src/main/java/com/specqq/chatbot/config/MetricsConfig.java` (parse count, cache hit rate, execution time)
 - [ ] T118 [P] Add actuator health check for NapCat WebSocket connection in `src/main/java/com/specqq/chatbot/config/HealthCheckConfig.java`
 - [ ] T119 Run quickstart.md validation: Verify all setup steps work on clean environment
 - [ ] T120 Update main README.md with CQ code feature description and usage examples

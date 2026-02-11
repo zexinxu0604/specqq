@@ -2,12 +2,15 @@ package com.specqq.chatbot.parser;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.specqq.chatbot.common.CQCodeConstants;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -37,15 +40,36 @@ public class CQCodeParser {
     private final Cache<String, Pattern> patternCache;
     private final Pattern cqCodePattern;
 
+    // T117: Prometheus metrics
+    private final Counter parseCounter;
+    private final Timer parseDurationTimer;
+    private final Counter cacheHitsCounter;
+    private final Counter cacheMissesCounter;
+    private final AtomicInteger totalCountGauge;
+
     /**
      * Constructor with dependency injection
      *
      * @param patternCache Caffeine cache for compiled patterns
+     * @param parseCounter Counter for parse operations
+     * @param parseDurationTimer Timer for parse duration
+     * @param cacheHitsCounter Counter for cache hits
+     * @param cacheMissesCounter Counter for cache misses
+     * @param totalCountGauge Gauge for total CQ codes parsed
      */
-    public CQCodeParser(@Qualifier(CQCodeConstants.CACHE_CQ_PATTERNS) Cache<String, Pattern> patternCache) {
+    public CQCodeParser(@Qualifier(CQCodeConstants.CACHE_CQ_PATTERNS) Cache<String, Pattern> patternCache,
+                        Counter parseCounter,
+                        Timer parseDurationTimer,
+                        Counter cacheHitsCounter,
+                        Counter cacheMissesCounter,
+                        AtomicInteger totalCountGauge) {
         this.patternCache = patternCache;
-        // Pre-compile the main CQ code pattern
         this.cqCodePattern = Pattern.compile(CQCodeConstants.CQ_CODE_PATTERN);
+        this.parseCounter = parseCounter;
+        this.parseDurationTimer = parseDurationTimer;
+        this.cacheHitsCounter = cacheHitsCounter;
+        this.cacheMissesCounter = cacheMissesCounter;
+        this.totalCountGauge = totalCountGauge;
         logger.info("CQCodeParser initialized with pattern: {}", CQCodeConstants.CQ_CODE_PATTERN);
     }
 
@@ -71,6 +95,8 @@ public class CQCodeParser {
             return Collections.emptyList();
         }
 
+        // T117: Record parse operation
+        parseCounter.increment();
         long startTime = System.nanoTime();
         List<CQCode> cqCodes = new ArrayList<>();
 
@@ -87,7 +113,14 @@ public class CQCodeParser {
                 cqCodes.add(cqCode);
             }
 
-            long elapsedMs = (System.nanoTime() - startTime) / 1_000_000;
+            // T117: Update total CQ code count gauge
+            totalCountGauge.addAndGet(cqCodes.size());
+
+            // T117: Record parse duration
+            long elapsedNanos = System.nanoTime() - startTime;
+            parseDurationTimer.record(elapsedNanos, java.util.concurrent.TimeUnit.NANOSECONDS);
+
+            long elapsedMs = elapsedNanos / 1_000_000;
             if (elapsedMs > CQCodeConstants.TARGET_PARSE_P95_MS) {
                 logger.warn("CQ code parsing exceeded P95 target: {}ms > {}ms (message length: {}, CQ codes: {})",
                         elapsedMs, CQCodeConstants.TARGET_PARSE_P95_MS, message.length(), cqCodes.size());
