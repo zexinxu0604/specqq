@@ -34,9 +34,13 @@ public class RuleEngine {
     private final ExactMatcher exactMatcher;
     private final ContainsMatcher containsMatcher;
     private final RegexMatcher regexMatcher;
+    private final StatisticsMatcher statisticsMatcher;
 
     // 匹配器映射
     private final Map<MessageRule.MatchType, RuleMatcher> matcherMap = new ConcurrentHashMap<>();
+
+    // Bot self-ID cache for filtering bot's own messages
+    private String botSelfId = null;
 
     /**
      * 初始化匹配器映射
@@ -46,6 +50,10 @@ public class RuleEngine {
         matcherMap.put(MessageRule.MatchType.EXACT, exactMatcher);
         matcherMap.put(MessageRule.MatchType.CONTAINS, containsMatcher);
         matcherMap.put(MessageRule.MatchType.REGEX, regexMatcher);
+        matcherMap.put(MessageRule.MatchType.STATISTICS, statisticsMatcher);
+
+        // Note: Bot self-ID will be retrieved via get_login_info API on first message
+        // and cached for subsequent message filtering
     }
 
     /**
@@ -58,6 +66,14 @@ public class RuleEngine {
         long startTime = System.currentTimeMillis();
 
         try {
+            // 0. Filter bot's own messages to prevent infinite loops
+            // TODO: Implement bot self-ID retrieval via get_login_info API
+            // For now, this check is a placeholder for T040 implementation
+            if (isBotMessage(message)) {
+                log.debug("Ignoring bot's own message: userId={}", message.getUserId());
+                return Optional.empty();
+            }
+
             // 1. 查询群聊
             GroupChat group = groupService.getGroupByGroupId(message.getGroupId());
             if (group == null) {
@@ -124,5 +140,44 @@ public class RuleEngine {
                 rule.getId(), rule.getMatchType(), rule.getPattern(), e);
             return false;
         }
+    }
+
+    /**
+     * Check if message is from the bot itself
+     *
+     * <p>Filters bot's own messages to prevent infinite loops in statistics rules.
+     * Bot self-ID is retrieved via get_login_info API on startup and cached.</p>
+     *
+     * @param message Message to check
+     * @return true if message is from bot, false otherwise
+     */
+    private boolean isBotMessage(MessageReceiveDTO message) {
+        if (message == null || message.getUserId() == null) {
+            return false;
+        }
+
+        // TODO: Implement bot self-ID retrieval via NapCat get_login_info API
+        // For now, return false (no filtering) - will be implemented in T040
+        // Expected implementation:
+        // 1. Call get_login_info API on first message
+        // 2. Cache bot's QQ ID in botSelfId field
+        // 3. Compare message.getUserId() with cached botSelfId
+
+        if (botSelfId == null) {
+            // Bot self-ID not yet retrieved
+            return false;
+        }
+
+        return botSelfId.equals(message.getUserId());
+    }
+
+    /**
+     * Set bot self-ID (called after retrieving from NapCat API)
+     *
+     * @param botId Bot's QQ ID
+     */
+    public void setBotSelfId(String botId) {
+        this.botSelfId = botId;
+        log.info("Bot self-ID cached: {}", botId);
     }
 }

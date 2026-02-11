@@ -1,0 +1,681 @@
+openapi: 3.0.3
+info:
+  title: CQ Code Parser API
+  description: |
+    API for parsing CQ codes from NapCat/OneBot 11 protocol messages and managing CQ code patterns.
+
+    **Feature**: `002-napcat-cqcode-parser`
+    **Version**: 1.0.0
+    **Base Path**: `/api/cqcode`
+  version: 1.0.0
+  contact:
+    name: SpecQQ Development Team
+
+servers:
+  - url: http://localhost:8080/api
+    description: Development server
+  - url: https://api.specqq.example.com/api
+    description: Production server
+
+tags:
+  - name: CQ Code Parsing
+    description: Parse and extract CQ codes from message strings
+  - name: CQ Code Patterns
+    description: Manage CQ code patterns for rule configuration
+  - name: CQ Code Validation
+    description: Validate CQ code syntax and structure
+
+paths:
+  /cqcode/parse:
+    post:
+      tags:
+        - CQ Code Parsing
+      summary: Parse CQ codes from message string
+      description: |
+        Extracts all CQ codes from a message string and returns structured data.
+
+        **Performance**: P95 <10ms, P99 <15ms
+
+        **Example Input**: `"Hello[CQ:face,id=123]世界[CQ:image,file=abc.jpg]"`
+
+        **Example Output**:
+        ```json
+        [
+          {"type": "face", "params": {"id": "123"}, "rawText": "[CQ:face,id=123]"},
+          {"type": "image", "params": {"file": "abc.jpg"}, "rawText": "[CQ:image,file=abc.jpg]"}
+        ]
+        ```
+      operationId: parseCQCodes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ParseCQCodeRequest'
+            examples:
+              mixedContent:
+                summary: Message with text and CQ codes
+                value:
+                  message: "Hello[CQ:face,id=123]世界[CQ:image,file=abc.jpg]"
+              textOnly:
+                summary: Pure text message
+                value:
+                  message: "Hello World"
+              cqCodesOnly:
+                summary: Only CQ codes
+                value:
+                  message: "[CQ:face,id=1][CQ:face,id=2][CQ:image,file=test.jpg]"
+      responses:
+        '200':
+          description: Successfully parsed CQ codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ParseCQCodeResponse'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: "Success"
+                    data:
+                      - type: "face"
+                        params:
+                          id: "123"
+                        rawText: "[CQ:face,id=123]"
+                      - type: "image"
+                        params:
+                          file: "abc.jpg"
+                        rawText: "[CQ:image,file=abc.jpg]"
+                    timestamp: "2026-02-11T10:30:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /cqcode/strip:
+    post:
+      tags:
+        - CQ Code Parsing
+      summary: Strip CQ codes from message
+      description: |
+        Removes all CQ codes from a message string, returning only plain text.
+
+        **Use Case**: Character counting for statistics
+
+        **Example**: `"Hello[CQ:face,id=123]World"` → `"HelloWorld"`
+      operationId: stripCQCodes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StripCQCodeRequest'
+      responses:
+        '200':
+          description: Successfully stripped CQ codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StripCQCodeResponse'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: "Success"
+                    data:
+                      originalMessage: "Hello[CQ:face,id=123]世界[CQ:image,file=abc.jpg]"
+                      strippedMessage: "Hello世界"
+                      characterCount: 7
+                    timestamp: "2026-02-11T10:30:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /cqcode/validate:
+    post:
+      tags:
+        - CQ Code Validation
+      summary: Validate CQ code syntax
+      description: |
+        Validates whether a string is a well-formed CQ code according to OneBot 11 specification.
+
+        **Valid Format**: `[CQ:type,param1=value1,param2=value2]`
+
+        **Invalid Examples**:
+        - `[CQ:face,id=` (missing closing bracket)
+        - `[CQ:,id=123]` (missing type)
+        - `[face,id=123]` (missing CQ: prefix)
+      operationId: validateCQCode
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidateCQCodeRequest'
+      responses:
+        '200':
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidateCQCodeResponse'
+              examples:
+                valid:
+                  value:
+                    code: 200
+                    message: "Success"
+                    data:
+                      valid: true
+                      cqCode: "[CQ:face,id=123]"
+                      type: "face"
+                      params:
+                        id: "123"
+                      errors: []
+                    timestamp: "2026-02-11T10:30:00Z"
+                invalid:
+                  value:
+                    code: 200
+                    message: "Success"
+                    data:
+                      valid: false
+                      cqCode: "[CQ:face,id="
+                      errors:
+                        - "Missing closing bracket"
+                        - "Incomplete parameter value"
+                    timestamp: "2026-02-11T10:30:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /cqcode/patterns:
+    get:
+      tags:
+        - CQ Code Patterns
+      summary: List predefined CQ code patterns
+      description: |
+        Returns a list of predefined CQ code patterns for frontend rule configuration.
+
+        **Use Case**: Populate CQ code selector dropdown in rule edit page
+
+        **Patterns Include**:
+        - Contains Image (包含图片)
+        - Contains Emoji (包含表情)
+        - Contains Mention (包含@提及)
+        - Contains Reply (包含回复)
+        - Contains Voice (包含语音)
+        - Contains Video (包含视频)
+      operationId: listCQCodePatterns
+      parameters:
+        - name: type
+          in: query
+          description: Filter by CQ code type
+          schema:
+            type: string
+            enum: [face, image, at, reply, record, video, all]
+          example: image
+      responses:
+        '200':
+          description: List of CQ code patterns
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListCQCodePatternsResponse'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: "Success"
+                    data:
+                      - id: "contains-image"
+                        label: "包含图片"
+                        type: "image"
+                        regexPattern: "\\[CQ:image.*\\]"
+                        description: "匹配包含图片的消息"
+                      - id: "contains-face"
+                        label: "包含表情"
+                        type: "face"
+                        regexPattern: "\\[CQ:face.*\\]"
+                        description: "匹配包含表情的消息"
+                    timestamp: "2026-02-11T10:30:00Z"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /cqcode/patterns/validate:
+    post:
+      tags:
+        - CQ Code Patterns
+      summary: Validate CQ code pattern configuration
+      description: |
+        Validates a CQ code pattern configuration before saving to a rule.
+
+        **Checks**:
+        - Regex pattern is valid
+        - Parameter filters are well-formed
+        - Logical operators are correct
+      operationId: validateCQCodePattern
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ValidatePatternRequest'
+      responses:
+        '200':
+          description: Pattern validation result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidatePatternResponse'
+              examples:
+                valid:
+                  value:
+                    code: 200
+                    message: "Success"
+                    data:
+                      valid: true
+                      pattern:
+                        id: "custom-pattern"
+                        type: "image"
+                        regexPattern: "\\[CQ:image,file=.*\\.jpg\\]"
+                      errors: []
+                    timestamp: "2026-02-11T10:30:00Z"
+                invalid:
+                  value:
+                    code: 200
+                    message: "Success"
+                    data:
+                      valid: false
+                      errors:
+                        - "Invalid regex syntax: unclosed bracket"
+                    timestamp: "2026-02-11T10:30:00Z"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /cqcode/types:
+    get:
+      tags:
+        - CQ Code Parsing
+      summary: Get supported CQ code types
+      description: |
+        Returns a list of all supported CQ code types with Chinese labels.
+
+        **Use Case**: Display human-readable labels in frontend
+      operationId: getCQCodeTypes
+      responses:
+        '200':
+          description: List of CQ code types
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CQCodeTypesResponse'
+              examples:
+                success:
+                  value:
+                    code: 200
+                    message: "Success"
+                    data:
+                      - type: "face"
+                        label: "表情"
+                        description: "QQ表情或emoji"
+                        unit: "个"
+                      - type: "image"
+                        label: "图片"
+                        description: "图片消息"
+                        unit: "张"
+                      - type: "at"
+                        label: "@提及"
+                        description: "@某人"
+                        unit: "次"
+                      - type: "reply"
+                        label: "回复"
+                        description: "回复某条消息"
+                        unit: "条"
+                      - type: "record"
+                        label: "语音"
+                        description: "语音消息"
+                        unit: "条"
+                      - type: "video"
+                        label: "视频"
+                        description: "视频消息"
+                        unit: "个"
+                    timestamp: "2026-02-11T10:30:00Z"
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  schemas:
+    # Request Schemas
+    ParseCQCodeRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Message string containing CQ codes
+          example: "Hello[CQ:face,id=123]World"
+          maxLength: 10000
+
+    StripCQCodeRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          description: Message string to strip CQ codes from
+          example: "Hello[CQ:face,id=123]World"
+          maxLength: 10000
+
+    ValidateCQCodeRequest:
+      type: object
+      required:
+        - cqCode
+      properties:
+        cqCode:
+          type: string
+          description: CQ code string to validate
+          example: "[CQ:face,id=123]"
+          maxLength: 1000
+
+    ValidatePatternRequest:
+      type: object
+      required:
+        - pattern
+      properties:
+        pattern:
+          $ref: '#/components/schemas/CQCodePattern'
+
+    # Response Schemas
+    ParseCQCodeResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CQCode'
+
+    StripCQCodeResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                originalMessage:
+                  type: string
+                  description: Original message with CQ codes
+                strippedMessage:
+                  type: string
+                  description: Message with CQ codes removed
+                characterCount:
+                  type: integer
+                  description: Unicode character count (code points)
+                  example: 10
+
+    ValidateCQCodeResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                valid:
+                  type: boolean
+                  description: Whether the CQ code is valid
+                cqCode:
+                  type: string
+                  description: The CQ code being validated
+                type:
+                  type: string
+                  description: CQ code type (if valid)
+                params:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Parsed parameters (if valid)
+                errors:
+                  type: array
+                  items:
+                    type: string
+                  description: Validation error messages
+
+    ListCQCodePatternsResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CQCodePattern'
+
+    ValidatePatternResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                valid:
+                  type: boolean
+                pattern:
+                  $ref: '#/components/schemas/CQCodePattern'
+                errors:
+                  type: array
+                  items:
+                    type: string
+
+    CQCodeTypesResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            data:
+              type: array
+              items:
+                $ref: '#/components/schemas/CQCodeType'
+
+    # Domain Models
+    CQCode:
+      type: object
+      required:
+        - type
+        - params
+        - rawText
+      properties:
+        type:
+          type: string
+          description: CQ code type (lowercase)
+          example: "face"
+          enum: [face, image, at, reply, record, video, other]
+        params:
+          type: object
+          additionalProperties:
+            type: string
+          description: Key-value parameters
+          example:
+            id: "123"
+        rawText:
+          type: string
+          description: Original CQ code text
+          example: "[CQ:face,id=123]"
+
+    CQCodePattern:
+      type: object
+      required:
+        - id
+        - label
+        - type
+      properties:
+        id:
+          type: string
+          description: Unique pattern identifier
+          example: "contains-image"
+        label:
+          type: string
+          description: Human-readable label (Chinese)
+          example: "包含图片"
+          maxLength: 50
+        type:
+          type: string
+          description: CQ code type to match
+          enum: [face, image, at, reply, record, video, any]
+        regexPattern:
+          type: string
+          description: Generated regex pattern
+          example: "\\[CQ:image.*\\]"
+        description:
+          type: string
+          description: Pattern description
+          example: "匹配包含图片的消息"
+        paramFilters:
+          type: array
+          items:
+            $ref: '#/components/schemas/ParamFilter'
+          description: Optional parameter filters
+        logicalOperator:
+          type: string
+          enum: [AND, OR]
+          description: Combine with other patterns
+          default: AND
+
+    ParamFilter:
+      type: object
+      required:
+        - key
+        - operator
+        - value
+      properties:
+        key:
+          type: string
+          description: Parameter key
+          example: "id"
+        operator:
+          type: string
+          enum: ['=', '!=', 'contains', 'regex']
+          description: Filter operator
+        value:
+          type: string
+          description: Filter value
+          example: "123"
+
+    CQCodeType:
+      type: object
+      required:
+        - type
+        - label
+        - unit
+      properties:
+        type:
+          type: string
+          description: CQ code type identifier
+          example: "face"
+        label:
+          type: string
+          description: Chinese label
+          example: "表情"
+        description:
+          type: string
+          description: Type description
+          example: "QQ表情或emoji"
+        unit:
+          type: string
+          description: Count unit (Chinese)
+          example: "个"
+
+    # Base Response
+    BaseResponse:
+      type: object
+      required:
+        - code
+        - message
+        - timestamp
+      properties:
+        code:
+          type: integer
+          description: HTTP status code
+          example: 200
+        message:
+          type: string
+          description: Response message
+          example: "Success"
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp (ISO 8601)
+          example: "2026-02-11T10:30:00Z"
+
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            error:
+              type: object
+              properties:
+                code:
+                  type: string
+                  description: Error code
+                  example: "INVALID_CQ_CODE"
+                details:
+                  type: string
+                  description: Detailed error message
+                  example: "Missing closing bracket in CQ code"
+                field:
+                  type: string
+                  description: Field name (if validation error)
+                  example: "message"
+
+  responses:
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalidMessage:
+              value:
+                code: 400
+                message: "Bad Request"
+                error:
+                  code: "INVALID_PARAMETER"
+                  details: "Message cannot be empty"
+                  field: "message"
+                timestamp: "2026-02-11T10:30:00Z"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            serverError:
+              value:
+                code: 500
+                message: "Internal Server Error"
+                error:
+                  code: "INTERNAL_ERROR"
+                  details: "An unexpected error occurred"
+                timestamp: "2026-02-11T10:30:00Z"
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token from /api/auth/login
+
+security:
+  - BearerAuth: []

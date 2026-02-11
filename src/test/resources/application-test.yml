@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: chatbot-router-test
+
+  datasource:
+    url: jdbc:tc:mysql:8.0:///chatbot_router?TC_DAEMON=true
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+    username: test
+    password: test
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+
+# NapCat Configuration (Test Mock Values)
+napcat:
+  http:
+    url: http://localhost:3000
+    access-token: test-token
+    timeout: 5000
+  websocket:
+    url: ws://localhost:3001
+    access-token: test-token
+    reconnect-interval: 5000
+
+# JWT Configuration
+jwt:
+  secret: test-secret-key-for-testing-only-minimum-32-characters-required
+  expiration: 86400000
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.specqq.chatbot: DEBUG

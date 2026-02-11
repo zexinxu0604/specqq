@@ -1,0 +1,119 @@
+{
+  "testMessages": [
+    {
+      "id": "test-001",
+      "description": "Mixed text and CQ codes",
+      "message": "Hello[CQ:face,id=123]你好世界[CQ:image,file=abc.jpg,url=https://example.com/abc.jpg]",
+      "expectedCQCodes": 2,
+      "expectedCharacters": 10,
+      "expectedTypes": {
+        "face": 1,
+        "image": 1
+      }
+    },
+    {
+      "id": "test-002",
+      "description": "Plain text only (Chinese and English)",
+      "message": "你好世界Hello",
+      "expectedCQCodes": 0,
+      "expectedCharacters": 9,
+      "expectedTypes": {}
+    },
+    {
+      "id": "test-003",
+      "description": "CQ codes only (no text)",
+      "message": "[CQ:face,id=1][CQ:face,id=2][CQ:image,file=test.jpg]",
+      "expectedCQCodes": 3,
+      "expectedCharacters": 0,
+      "expectedTypes": {
+        "face": 2,
+        "image": 1
+      }
+    },
+    {
+      "id": "test-004",
+      "description": "Malformed CQ code (missing closing bracket)",
+      "message": "Test[CQ:face,id=123 message continues",
+      "expectedCQCodes": 0,
+      "expectedCharacters": 38,
+      "expectedTypes": {},
+      "note": "Malformed CQ code treated as plain text"
+    },
+    {
+      "id": "test-005",
+      "description": "Multiple CQ code types",
+      "message": "Hello[CQ:face,id=1][CQ:at,qq=123456][CQ:reply,id=789][CQ:image,file=a.jpg][CQ:record,file=b.mp3][CQ:video,file=c.mp4]",
+      "expectedCQCodes": 6,
+      "expectedCharacters": 5,
+      "expectedTypes": {
+        "face": 1,
+        "at": 1,
+        "reply": 1,
+        "image": 1,
+        "record": 1,
+        "video": 1
+      }
+    },
+    {
+      "id": "test-006",
+      "description": "Repeated CQ codes (50 identical emojis)",
+      "message": "[CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1][CQ:face,id=1]",
+      "expectedCQCodes": 50,
+      "expectedCharacters": 0,
+      "expectedTypes": {
+        "face": 50
+      }
+    },
+    {
+      "id": "test-007",
+      "description": "Long message with mixed content (1000+ characters)",
+      "message": "这是一条很长的消息，用于测试性能。This is a long message for performance testing. Lorem ipsum dolor sit amet, consectetur adipiscing elit. [CQ:face,id=1] 中文字符和英文字符混合。Mixed Chinese and English characters. [CQ:image,file=test.jpg] 更多文本内容用于填充。More text content for filling. 重复内容开始。Repeated content starts. 测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试测试[CQ:at,qq=123456]结束标记。End marker.",
+      "expectedCQCodes": 3,
+      "expectedCharacters": 603,
+      "expectedTypes": {
+        "face": 1,
+        "image": 1,
+        "at": 1
+      }
+    },
+    {
+      "id": "test-008",
+      "description": "Unknown CQ code type",
+      "message": "Test[CQ:future_type,param=value]message",
+      "expectedCQCodes": 1,
+      "expectedCharacters": 11,
+      "expectedTypes": {
+        "other": 1
+      },
+      "note": "Unknown CQ code types are classified as 'other'"
+    },
+    {
+      "id": "test-009",
+      "description": "CQ code without parameters",
+      "message": "Test[CQ:face]message",
+      "expectedCQCodes": 1,
+      "expectedCharacters": 11,
+      "expectedTypes": {
+        "face": 1
+      }
+    },
+    {
+      "id": "test-010",
+      "description": "Empty message",
+      "message": "",
+      "expectedCQCodes": 0,
+      "expectedCharacters": 0,
+      "expectedTypes": {}
+    }
+  ],
+  "performanceTestMessages": [
+    {
+      "id": "perf-001",
+      "description": "50 CQ codes for P95 latency test",
+      "message": "[CQ:face,id=1][CQ:face,id=2][CQ:face,id=3][CQ:face,id=4][CQ:face,id=5][CQ:face,id=6][CQ:face,id=7][CQ:face,id=8][CQ:face,id=9][CQ:face,id=10][CQ:image,file=1.jpg][CQ:image,file=2.jpg][CQ:image,file=3.jpg][CQ:image,file=4.jpg][CQ:image,file=5.jpg][CQ:at,qq=1][CQ:at,qq=2][CQ:at,qq=3][CQ:at,qq=4][CQ:at,qq=5][CQ:reply,id=1][CQ:reply,id=2][CQ:reply,id=3][CQ:reply,id=4][CQ:reply,id=5][CQ:record,file=1.mp3][CQ:record,file=2.mp3][CQ:record,file=3.mp3][CQ:record,file=4.mp3][CQ:record,file=5.mp3][CQ:video,file=1.mp4][CQ:video,file=2.mp4][CQ:video,file=3.mp4][CQ:video,file=4.mp4][CQ:video,file=5.mp4][CQ:face,id=11][CQ:face,id=12][CQ:face,id=13][CQ:face,id=14][CQ:face,id=15][CQ:image,file=6.jpg][CQ:image,file=7.jpg][CQ:image,file=8.jpg][CQ:image,file=9.jpg][CQ:image,file=10.jpg][CQ:at,qq=6][CQ:at,qq=7][CQ:at,qq=8][CQ:at,qq=9][CQ:at,qq=10]",
+      "expectedCQCodes": 50,
+      "targetParseP95Ms": 10,
+      "targetCalculateP95Ms": 50
+    }
+  ]
+}

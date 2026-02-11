@@ -7,6 +7,7 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.specqq.chatbot.engine.ContainsMatcher;
 import com.specqq.chatbot.engine.ExactMatcher;
 import com.specqq.chatbot.engine.RegexMatcher;
+import com.specqq.chatbot.engine.StatisticsMatcher;
 import com.specqq.chatbot.engine.RuleMatcher;
 import com.specqq.chatbot.entity.GroupRuleConfig;
 import com.specqq.chatbot.entity.MessageRule;
@@ -38,6 +39,7 @@ public class RuleService extends ServiceImpl<MessageRuleMapper, MessageRule> {
     private final ExactMatcher exactMatcher;
     private final ContainsMatcher containsMatcher;
     private final RegexMatcher regexMatcher;
+    private final StatisticsMatcher statisticsMatcher;
 
     /**
      * 查询群聊启用的规则列表(按优先级排序)
@@ -322,6 +324,7 @@ public class RuleService extends ServiceImpl<MessageRuleMapper, MessageRule> {
             case EXACT -> exactMatcher;
             case CONTAINS -> containsMatcher;
             case REGEX -> regexMatcher;
+            case STATISTICS -> statisticsMatcher;
         };
 
         return matcher.matches(message, pattern);

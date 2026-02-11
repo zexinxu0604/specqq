@@ -50,6 +50,9 @@ class RuleEngineTest {
     @Mock
     private RegexMatcher regexMatcher;
 
+    @Mock
+    private StatisticsMatcher statisticsMatcher;
+
     @InjectMocks
     private RuleEngine ruleEngine;
 
@@ -328,7 +331,7 @@ class RuleEngineTest {
     void testException_UnknownMatchType() {
         // 创建一个规则，但不初始化匹配器映射
         RuleEngine engineWithoutInit = new RuleEngine(
-            ruleService, groupService, exactMatcher, containsMatcher, regexMatcher
+            ruleService, groupService, exactMatcher, containsMatcher, regexMatcher, statisticsMatcher
         );
         // 不调用init()
 

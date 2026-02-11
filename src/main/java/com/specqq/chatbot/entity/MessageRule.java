@@ -98,6 +98,12 @@ public class MessageRule {
         /**
          * 正则表达式匹配
          */
-        REGEX
+        REGEX,
+
+        /**
+         * 消息统计规则(自动匹配所有消息)
+         * 用于CQ码解析和消息统计功能
+         */
+        STATISTICS
     }
 }
