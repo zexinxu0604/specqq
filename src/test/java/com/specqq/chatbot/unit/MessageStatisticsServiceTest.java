@@ -49,7 +49,16 @@ class MessageStatisticsServiceTest {
         Cache<String, Pattern> cache = Caffeine.newBuilder()
                 .maximumSize(10)
                 .build();
-        parser = new CQCodeParser(cache);
+
+        // Create mock Prometheus metrics
+        io.micrometer.core.instrument.simple.SimpleMeterRegistry registry = new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        io.micrometer.core.instrument.Counter parseCounter = registry.counter("test.cqcode.parse");
+        io.micrometer.core.instrument.Timer parseDurationTimer = registry.timer("test.cqcode.duration");
+        io.micrometer.core.instrument.Counter cacheHitsCounter = registry.counter("test.cqcode.cache.hits");
+        io.micrometer.core.instrument.Counter cacheMissesCounter = registry.counter("test.cqcode.cache.misses");
+        java.util.concurrent.atomic.AtomicInteger totalCountGauge = new java.util.concurrent.atomic.AtomicInteger(0);
+
+        parser = new CQCodeParser(cache, parseCounter, parseDurationTimer, cacheHitsCounter, cacheMissesCounter, totalCountGauge);
 
         // Note: Redis mocks are set up in individual tests as needed
         service = new MessageStatisticsService(parser, redisTemplate);
