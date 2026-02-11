@@ -3,9 +3,12 @@ package com.specqq.chatbot.engine;
 import com.specqq.chatbot.adapter.NapCatAdapter;
 import com.specqq.chatbot.dto.ApiCallResponseDTO;
 import com.specqq.chatbot.dto.MessageReceiveDTO;
+import com.specqq.chatbot.engine.policy.PolicyChain;
 import com.specqq.chatbot.entity.GroupChat;
 import com.specqq.chatbot.entity.MessageRule;
+import com.specqq.chatbot.entity.RulePolicy;
 import com.specqq.chatbot.service.GroupService;
+import com.specqq.chatbot.service.PolicyService;
 import com.specqq.chatbot.service.RuleService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -34,27 +37,37 @@ public class RuleEngine {
 
     private final RuleService ruleService;
     private final GroupService groupService;
+    private final PolicyService policyService;
+    private final PolicyChain policyChain;
     private final ExactMatcher exactMatcher;
     private final ContainsMatcher containsMatcher;
     private final RegexMatcher regexMatcher;
+    private final PrefixMatcher prefixMatcher;
+    private final SuffixMatcher suffixMatcher;
     private final StatisticsMatcher statisticsMatcher;
     private final NapCatAdapter napCatAdapter;
 
-    // 匹配器映射
+    // Matcher mapping
     private final Map<MessageRule.MatchType, RuleMatcher> matcherMap = new ConcurrentHashMap<>();
 
     // Bot self-ID cache for filtering bot's own messages
     private volatile String botSelfId = null;
 
     /**
-     * 初始化匹配器映射
+     * Initialize matcher mapping
+     *
+     * <p>T069: Register all matchers including new PREFIX and SUFFIX matchers</p>
      */
     @jakarta.annotation.PostConstruct
     public void init() {
         matcherMap.put(MessageRule.MatchType.EXACT, exactMatcher);
         matcherMap.put(MessageRule.MatchType.CONTAINS, containsMatcher);
         matcherMap.put(MessageRule.MatchType.REGEX, regexMatcher);
+        matcherMap.put(MessageRule.MatchType.PREFIX, prefixMatcher);
+        matcherMap.put(MessageRule.MatchType.SUFFIX, suffixMatcher);
         matcherMap.put(MessageRule.MatchType.STATISTICS, statisticsMatcher);
+
+        log.info("RuleEngine initialized with {} matchers", matcherMap.size());
 
         // Note: Bot self-ID will be retrieved via get_login_info API on first message
         // and cached for subsequent message filtering
@@ -102,12 +115,25 @@ public class RuleEngine {
                 return Optional.empty();
             }
 
-            // 3. 短路求值: 按优先级匹配，第一条匹配后立即返回
+            // 3. Short-circuit evaluation: match by priority, return first match
+            // T069: Integrate PolicyChain for policy enforcement
             for (MessageRule rule : rules) {
                 if (matchRule(message.getMessageContent(), rule)) {
+                    // Rule matched, now check policy constraints
+                    RulePolicy policy = policyService.getPolicyByRuleId(rule.getId());
+                    PolicyChain.PolicyCheckResult policyResult = policyChain.check(message, policy);
+
+                    if (!policyResult.isPassed()) {
+                        // Policy check failed, log and continue to next rule
+                        log.info("Rule matched but policy check failed: ruleId={}, policy={}, reason={}",
+                                rule.getId(), policyResult.getFailedPolicy(), policyResult.getReason());
+                        continue;
+                    }
+
+                    // Rule matched and policy passed
                     long elapsedTime = System.currentTimeMillis() - startTime;
-                    log.info("Rule matched: ruleId={}, ruleName={}, groupId={}, elapsedMs={}",
-                        rule.getId(), rule.getName(), message.getGroupId(), elapsedTime);
+                    log.info("Rule matched and policy passed: ruleId={}, ruleName={}, groupId={}, elapsedMs={}",
+                            rule.getId(), rule.getName(), message.getGroupId(), elapsedTime);
                     return Optional.of(rule);
                 }
             }

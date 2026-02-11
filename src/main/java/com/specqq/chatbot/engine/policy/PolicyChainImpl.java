@@ -24,15 +24,20 @@ public class PolicyChainImpl implements PolicyChain {
 
     private final List<PolicyInterceptor> interceptors;
 
-    public PolicyChainImpl() {
-        // TODO: 在 Phase 5 实现拦截器后，通过构造函数注入
+    public PolicyChainImpl(
+            ScopeInterceptor scopeInterceptor,
+            RateLimitInterceptor rateLimitInterceptor,
+            TimeWindowInterceptor timeWindowInterceptor,
+            RoleInterceptor roleInterceptor,
+            CooldownInterceptor cooldownInterceptor
+    ) {
         // 按固定顺序添加拦截器
         this.interceptors = new ArrayList<>();
-        // interceptors.add(scopeInterceptor);
-        // interceptors.add(rateLimitInterceptor);
-        // interceptors.add(timeWindowInterceptor);
-        // interceptors.add(roleInterceptor);
-        // interceptors.add(cooldownInterceptor);
+        interceptors.add(scopeInterceptor);
+        interceptors.add(rateLimitInterceptor);
+        interceptors.add(timeWindowInterceptor);
+        interceptors.add(roleInterceptor);
+        interceptors.add(cooldownInterceptor);
     }
 
     @Override
