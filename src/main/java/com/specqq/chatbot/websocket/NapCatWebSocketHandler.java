@@ -5,7 +5,8 @@ import com.specqq.chatbot.adapter.ClientAdapter;
 import com.specqq.chatbot.adapter.NapCatAdapter;
 import com.specqq.chatbot.dto.ApiCallResponseDTO;
 import com.specqq.chatbot.dto.MessageReceiveDTO;
-import com.specqq.chatbot.engine.MessageRouter;
+import com.specqq.chatbot.dto.MessageReplyDTO;
+import com.specqq.chatbot.service.MessageRouterService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -44,7 +45,7 @@ public class NapCatWebSocketHandler extends TextWebSocketHandler {
 
     private final WebSocketClient webSocketClient;
     private final ClientAdapter clientAdapter;
-    private final MessageRouter messageRouter;
+    private final MessageRouterService messageRouterService;
     private final ObjectMapper objectMapper;
 
     // NapCatAdapter for handling API responses (optional - may be null during initialization)
@@ -154,16 +155,47 @@ public class NapCatWebSocketHandler extends TextWebSocketHandler {
     }
 
     /**
-     * 处理事件消息 (群消息、通知等)
+     * Handle event message (group messages, notifications, etc.)
+     *
+     * <p>T072: Integrate MessageRouterService with async routing and reply sending</p>
      */
     private void handleEventMessage(String payload) {
         try {
-            // 解析消息
+            // Parse message
             MessageReceiveDTO receivedMessage = clientAdapter.parseMessage(payload);
 
             if (receivedMessage != null) {
-                // 路由消息(异步处理)
-                messageRouter.routeMessage(receivedMessage);
+                // Route message asynchronously through new MessageRouterService
+                messageRouterService.routeMessage(receivedMessage)
+                        .thenAccept(replyOpt -> {
+                            if (replyOpt.isPresent()) {
+                                MessageReplyDTO reply = replyOpt.get();
+                                // Send reply back to chat platform
+                                clientAdapter.sendReply(reply)
+                                        .thenAccept(success -> {
+                                            if (success) {
+                                                log.info("Reply sent successfully: groupId={}",
+                                                        reply.getGroupId());
+                                            } else {
+                                                log.error("Failed to send reply: groupId={}",
+                                                        reply.getGroupId());
+                                            }
+                                        })
+                                        .exceptionally(ex -> {
+                                            log.error("Exception while sending reply: groupId={}",
+                                                    reply.getGroupId(), ex);
+                                            return null;
+                                        });
+                            } else {
+                                log.debug("No reply generated for message: groupId={}",
+                                        receivedMessage.getGroupId());
+                            }
+                        })
+                        .exceptionally(ex -> {
+                            log.error("Exception during message routing: groupId={}",
+                                    receivedMessage.getGroupId(), ex);
+                            return null;
+                        });
             }
 
         } catch (Exception e) {

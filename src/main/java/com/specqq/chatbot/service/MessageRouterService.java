@@ -1,0 +1,200 @@
+package com.specqq.chatbot.service;
+
+import com.specqq.chatbot.dto.MessageReceiveDTO;
+import com.specqq.chatbot.dto.MessageReplyDTO;
+import com.specqq.chatbot.entity.MessageRule;
+import com.specqq.chatbot.handler.MessageHandler;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
+import org.springframework.stereotype.Service;
+
+import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+
+/**
+ * Message Router Service
+ *
+ * <p>T071: Routes messages through rule engine and executes handlers with timeout</p>
+ *
+ * @author Claude Code
+ * @since 2026-02-11
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class MessageRouterService {
+
+    private final RuleEngineService ruleEngineService;
+    private final HandlerRegistryService handlerRegistryService;
+
+    /**
+     * Route message through rule engine and execute handler
+     *
+     * <p>T071: Async routing with 30-second timeout</p>
+     * <p>Flow: Match Rule → Execute Handler → Return Reply</p>
+     *
+     * @param message Incoming message
+     * @return CompletableFuture containing reply (or empty if no match/error)
+     */
+    @Async("messageRouterExecutor")
+    public CompletableFuture<Optional<MessageReplyDTO>> routeMessage(MessageReceiveDTO message) {
+        long startTime = System.currentTimeMillis();
+
+        log.info("Message routing started: groupId={}, userId={}, messageId={}",
+                message.getGroupId(), message.getUserId(), message.getMessageId());
+
+        try {
+            // Step 1: Match rule with timeout
+            CompletableFuture<Optional<MessageRule>> ruleFuture =
+                    ruleEngineService.matchRulesAsync(message);
+
+            Optional<MessageRule> matchedRule = ruleFuture
+                    .orTimeout(10, TimeUnit.SECONDS)
+                    .get(10, TimeUnit.SECONDS);
+
+            if (matchedRule.isEmpty()) {
+                log.debug("No rule matched, skipping handler execution");
+                return CompletableFuture.completedFuture(Optional.empty());
+            }
+
+            MessageRule rule = matchedRule.get();
+            log.info("Rule matched: ruleId={}, ruleName={}", rule.getId(), rule.getName());
+
+            // Step 2: Get handler type from handler config
+            // For now, use simple reply from response_template if handler not configured
+            String handlerConfig = rule.getHandlerConfig();
+            if (handlerConfig == null || handlerConfig.isEmpty()) {
+                // Fallback to response_template for simple replies
+                String replyContent = rule.getResponseTemplate();
+                if (replyContent == null || replyContent.isEmpty()) {
+                    log.warn("Rule has no handler or response template: ruleId={}", rule.getId());
+                    return CompletableFuture.completedFuture(Optional.empty());
+                }
+
+                MessageReplyDTO reply = MessageReplyDTO.builder()
+                        .groupId(message.getGroupId())
+                        .replyContent(replyContent)
+                        .build();
+
+                long elapsedTime = System.currentTimeMillis() - startTime;
+                log.info("Message routing completed (template): ruleId={}, elapsedMs={}",
+                        rule.getId(), elapsedTime);
+
+                return CompletableFuture.completedFuture(Optional.of(reply));
+            }
+
+            // Parse handler config JSON to get handler type
+            // Expected format: {"handlerType": "ECHO", "params": {...}}
+            String handlerType = parseHandlerType(handlerConfig);
+            if (handlerType == null) {
+                log.warn("Could not parse handler type from config: ruleId={}", rule.getId());
+                return CompletableFuture.completedFuture(Optional.empty());
+            }
+
+            MessageHandler handler = handlerRegistryService.getHandler(handlerType);
+            if (handler == null) {
+                log.error("Handler not found: handlerType={}, ruleId={}", handlerType, rule.getId());
+                return CompletableFuture.completedFuture(Optional.empty());
+            }
+
+            // Step 3: Execute handler with timeout
+            MessageReplyDTO reply;
+            try {
+                final MessageHandler finalHandler = handler;
+                final String finalHandlerConfig = handlerConfig;
+
+                CompletableFuture<MessageReplyDTO> handlerFuture = CompletableFuture.supplyAsync(() -> {
+                    try {
+                        return finalHandler.handle(message, finalHandlerConfig);
+                    } catch (Exception e) {
+                        log.error("Handler execution failed: handlerType={}, ruleId={}",
+                                handlerType, rule.getId(), e);
+                        return null;
+                    }
+                });
+
+                reply = handlerFuture
+                        .orTimeout(30, TimeUnit.SECONDS)
+                        .get(30, TimeUnit.SECONDS);
+            } catch (TimeoutException e) {
+                log.error("Handler execution timeout: handlerType={}, ruleId={}",
+                        handlerType, rule.getId(), e);
+                return CompletableFuture.completedFuture(Optional.empty());
+            }
+
+            if (reply == null || reply.getReplyContent() == null || reply.getReplyContent().isEmpty()) {
+                log.warn("Handler returned empty reply: handlerType={}, ruleId={}",
+                        handlerType, rule.getId());
+                return CompletableFuture.completedFuture(Optional.empty());
+            }
+
+            // Step 4: Set groupId if not already set
+            if (reply.getGroupId() == null) {
+                reply = MessageReplyDTO.builder()
+                        .groupId(message.getGroupId())
+                        .replyContent(reply.getReplyContent())
+                        .build();
+            }
+
+            long elapsedTime = System.currentTimeMillis() - startTime;
+            log.info("Message routing completed: ruleId={}, handlerType={}, elapsedMs={}",
+                    rule.getId(), handlerType, elapsedTime);
+
+            return CompletableFuture.completedFuture(Optional.of(reply));
+
+        } catch (TimeoutException e) {
+            long elapsedTime = System.currentTimeMillis() - startTime;
+            log.error("Message routing timeout: groupId={}, elapsedMs={}",
+                    message.getGroupId(), elapsedTime, e);
+            return CompletableFuture.completedFuture(Optional.empty());
+
+        } catch (Exception e) {
+            long elapsedTime = System.currentTimeMillis() - startTime;
+            log.error("Message routing failed: groupId={}, elapsedMs={}",
+                    message.getGroupId(), elapsedTime, e);
+            return CompletableFuture.completedFuture(Optional.empty());
+        }
+    }
+
+    /**
+     * Route message synchronously (blocking)
+     *
+     * <p>For testing or cases where async is not needed</p>
+     *
+     * @param message Incoming message
+     * @return Reply (or empty if no match/error)
+     */
+    public Optional<MessageReplyDTO> routeMessageSync(MessageReceiveDTO message) {
+        try {
+            return routeMessage(message).get(35, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.error("Sync message routing failed: groupId={}", message.getGroupId(), e);
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Parse handler type from handler config JSON
+     *
+     * <p>Expected format: {"handlerType": "ECHO", "params": {...}}</p>
+     *
+     * @param handlerConfig JSON string
+     * @return Handler type or null if parse failed
+     */
+    private String parseHandlerType(String handlerConfig) {
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(handlerConfig);
+            if (node.has("handlerType")) {
+                return node.get("handlerType").asText();
+            }
+            return null;
+        } catch (Exception e) {
+            log.error("Failed to parse handler config: {}", handlerConfig, e);
+            return null;
+        }
+    }
+}

@@ -545,4 +545,243 @@ public class RuleController {
         }
         return MessageRule.MatchType.valueOf(dtoMatchType.name());
     }
+
+    /**
+     * Test rule matching
+     *
+     * <p>T073: Test if a message matches a rule and passes policy checks</p>
+     */
+    @PostMapping("/test")
+    @Operation(summary = "Test rule matching", description = "Test if a message matches a rule and passes policy checks")
+    public Result<TestRuleResult> testRule(@Valid @RequestBody TestRuleRequest request) {
+        log.info("Testing rule: ruleId={}, message={}", request.getRuleId(), request.getMessage());
+
+        try {
+            // Get rule
+            MessageRule rule = ruleService.getRuleById(request.getRuleId());
+            if (rule == null) {
+                return Result.error(ResultCode.NOT_FOUND, "Rule not found");
+            }
+
+            // Create test message DTO
+            com.specqq.chatbot.dto.MessageReceiveDTO testMessage = com.specqq.chatbot.dto.MessageReceiveDTO.builder()
+                    .messageId("test-" + System.currentTimeMillis())
+                    .groupId(request.getGroupId() != null ? request.getGroupId() : "test-group")
+                    .userId(request.getUserId() != null ? request.getUserId() : "test-user")
+                    .messageContent(request.getMessage())
+                    .timestamp(java.time.LocalDateTime.now())
+                    .build();
+
+            // Test rule matching
+            com.specqq.chatbot.engine.RuleMatcher matcher = getMatcherForType(rule.getMatchType());
+            boolean matched = matcher != null && matcher.matches(request.getMessage(), rule.getPattern());
+
+            TestRuleResult result = new TestRuleResult();
+            result.setMatched(matched);
+            result.setRuleName(rule.getName());
+            result.setMatchType(rule.getMatchType().name());
+            result.setPattern(rule.getPattern());
+
+            if (!matched) {
+                result.setPolicyPassed(false);
+                result.setFailedPolicy(null);
+                result.setReason("Message does not match pattern");
+                return Result.success(result);
+            }
+
+            // Test policy checks if rule matched
+            RulePolicy policy = policyService.getPolicyByRuleId(rule.getId());
+            if (policy != null) {
+                com.specqq.chatbot.engine.policy.PolicyChain policyChain = getPolicyChain();
+                com.specqq.chatbot.engine.policy.PolicyChain.PolicyCheckResult policyResult =
+                        policyChain.check(testMessage, policy);
+
+                result.setPolicyPassed(policyResult.isPassed());
+                result.setFailedPolicy(policyResult.getFailedPolicy());
+                result.setReason(policyResult.getReason());
+            } else {
+                result.setPolicyPassed(true);
+                result.setFailedPolicy(null);
+                result.setReason("No policy configured");
+            }
+
+            return Result.success(result);
+
+        } catch (Exception e) {
+            log.error("Failed to test rule: ruleId={}", request.getRuleId(), e);
+            return Result.error(ResultCode.INTERNAL_ERROR, "Failed to test rule: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Get matcher for match type
+     */
+    private com.specqq.chatbot.engine.RuleMatcher getMatcherForType(MessageRule.MatchType matchType) {
+        // This is a simplified implementation for testing
+        // In production, inject matchers via constructor
+        try {
+            return switch (matchType) {
+                case EXACT -> new com.specqq.chatbot.engine.ExactMatcher();
+                case CONTAINS -> new com.specqq.chatbot.engine.ContainsMatcher();
+                case REGEX -> new com.specqq.chatbot.engine.RegexMatcher(
+                        com.github.benmanes.caffeine.cache.Caffeine.newBuilder()
+                                .maximumSize(1000)
+                                .build()
+                );
+                case PREFIX -> new com.specqq.chatbot.engine.PrefixMatcher();
+                case SUFFIX -> new com.specqq.chatbot.engine.SuffixMatcher();
+                default -> null;
+            };
+        } catch (Exception e) {
+            log.error("Failed to create matcher for type: {}", matchType, e);
+            return null;
+        }
+    }
+
+    /**
+     * Get policy chain (simplified for testing)
+     *
+     * <p>Note: This creates a minimal policy chain for testing purposes only</p>
+     * <p>Some interceptors (RateLimit, Cooldown) are disabled to avoid Redis dependency</p>
+     */
+    private com.specqq.chatbot.engine.policy.PolicyChain getPolicyChain() {
+        // Create a test-only policy chain with minimal dependencies
+        // Only Scope and TimeWindow interceptors will work properly in test mode
+        return new com.specqq.chatbot.engine.policy.PolicyChain() {
+            @Override
+            public PolicyCheckResult check(com.specqq.chatbot.dto.MessageReceiveDTO message,
+                                          com.specqq.chatbot.entity.RulePolicy policy) {
+                if (policy == null) {
+                    return PolicyCheckResult.pass();
+                }
+
+                // Only check scope and time window for testing
+                com.specqq.chatbot.interceptor.ScopeInterceptor scopeInterceptor =
+                        new com.specqq.chatbot.interceptor.ScopeInterceptor();
+                if (!scopeInterceptor.intercept(message, policy)) {
+                    return PolicyCheckResult.fail("Scope", scopeInterceptor.getInterceptReason());
+                }
+
+                com.specqq.chatbot.interceptor.TimeWindowInterceptor timeWindowInterceptor =
+                        new com.specqq.chatbot.interceptor.TimeWindowInterceptor();
+                if (!timeWindowInterceptor.intercept(message, policy)) {
+                    return PolicyCheckResult.fail("TimeWindow", timeWindowInterceptor.getInterceptReason());
+                }
+
+                // Skip RateLimit, Role, and Cooldown checks in test mode
+                return PolicyCheckResult.pass();
+            }
+        };
+    }
+
+    /**
+     * Test rule request DTO
+     */
+    public static class TestRuleRequest {
+        private Long ruleId;
+        private String message;
+        private String groupId;
+        private String userId;
+
+        public Long getRuleId() {
+            return ruleId;
+        }
+
+        public void setRuleId(Long ruleId) {
+            this.ruleId = ruleId;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
+        }
+
+        public String getGroupId() {
+            return groupId;
+        }
+
+        public void setGroupId(String groupId) {
+            this.groupId = groupId;
+        }
+
+        public String getUserId() {
+            return userId;
+        }
+
+        public void setUserId(String userId) {
+            this.userId = userId;
+        }
+    }
+
+    /**
+     * Test rule result DTO
+     */
+    public static class TestRuleResult {
+        private boolean matched;
+        private String ruleName;
+        private String matchType;
+        private String pattern;
+        private boolean policyPassed;
+        private String failedPolicy;
+        private String reason;
+
+        public boolean isMatched() {
+            return matched;
+        }
+
+        public void setMatched(boolean matched) {
+            this.matched = matched;
+        }
+
+        public String getRuleName() {
+            return ruleName;
+        }
+
+        public void setRuleName(String ruleName) {
+            this.ruleName = ruleName;
+        }
+
+        public String getMatchType() {
+            return matchType;
+        }
+
+        public void setMatchType(String matchType) {
+            this.matchType = matchType;
+        }
+
+        public String getPattern() {
+            return pattern;
+        }
+
+        public void setPattern(String pattern) {
+            this.pattern = pattern;
+        }
+
+        public boolean isPolicyPassed() {
+            return policyPassed;
+        }
+
+        public void setPolicyPassed(boolean policyPassed) {
+            this.policyPassed = policyPassed;
+        }
+
+        public String getFailedPolicy() {
+            return failedPolicy;
+        }
+
+        public void setFailedPolicy(String failedPolicy) {
+            this.failedPolicy = failedPolicy;
+        }
+
+        public String getReason() {
+            return reason;
+        }
+
+        public void setReason(String reason) {
+            this.reason = reason;
+        }
+    }
 }
