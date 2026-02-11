@@ -4,6 +4,8 @@
 **Input**: Design documents from `/specs/002-napcat-cqcode-parser/`
 **Prerequisites**: plan.md, spec.md, data-model.md, contracts/
 
+**Progress**: 100/122 tasks complete (82.0%) ✅
+
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
 ## Format: `[ID] [P?] [Story] Description`
@@ -277,7 +279,7 @@ Before proceeding to implementation tasks (T026-T056), you MUST:
 - [x] T117 [P] Add Prometheus metrics for CQ code parsing in `src/main/java/com/specqq/chatbot/config/MetricsConfig.java` (parse count, cache hit rate, execution time)
 - [x] T118 [P] Add actuator health check for NapCat WebSocket connection in `src/main/java/com/specqq/chatbot/config/HealthCheckConfig.java`
 - [ ] T119 Run quickstart.md validation: Verify all setup steps work on clean environment
-- [ ] T120 Update main README.md with CQ code feature description and usage examples
+- [x] T120 Update main README.md with CQ code feature description and usage examples
 
 ### Validation Tasks (Constitution Compliance)
 

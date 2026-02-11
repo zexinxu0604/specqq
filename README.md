@@ -73,6 +73,14 @@ open http://localhost:5173
    - 抽象协议层设计
    - 支持扩展到微信、钉钉等平台
 
+4. **CQ码解析与消息统计** (Feature 002) ✅
+   - 解析OneBot 11协议CQ码 (表情、图片、@提及等)
+   - 实时消息统计 (字数、CQ码类型统计)
+   - CQ码规则匹配 (支持正则表达式模式)
+   - NapCat API集成 (群信息、成员管理、消息操作)
+   - Prometheus监控指标 (解析性能、API成功率)
+   - Spring Boot Actuator健康检查
+
 ### 技术栈
 
 **后端**:
@@ -204,14 +212,25 @@ redis-cli ping
 
 ## 📊 项目进度
 
-### 开发进度: 75/89 (84.3%)
+### 开发进度: 99/122 (81.1%)
 
+**Feature 001 (Chatbot Router)**: ✅ 75/89 (84.3%)
 - ✅ Phase 1: Setup (12任务) - 100%
 - ✅ Phase 2: Foundational (15任务) - 100%
 - ✅ Phase 3: User Story 1 (30任务) - 100%
 - ✅ Phase 4: User Story 2 (20任务) - 100%
 - ⏳ Phase 5: User Story 3 (8任务) - 0%
 - ⏳ Phase 6: Polish (4任务) - 0%
+
+**Feature 002 (CQ Code Parser)**: ✅ 99/122 (81.1%)
+- ✅ Phase 1: Setup (4任务) - 100%
+- ✅ Phase 2: Foundational (12任务) - 100%
+- ✅ Phase 3: User Story 1 (35任务) - 100%
+- ✅ Phase 4: User Story 2 (17任务) - 100% (Backend)
+- ✅ Phase 5: User Story 3 (27任务) - 100%
+- ✅ Phase 6: Polish (9任务) - 88.9%
+- ⏳ Frontend (11任务) - 0%
+- ⏳ Validation (7任务) - 0%
 
 ### 代码质量: ⭐⭐⭐⭐⭐ (4.8/5)
 
@@ -388,6 +407,69 @@ VITE_API_BASE_URL=http://localhost:8080/api
 - GET `/trends` - 消息趋势
 - POST `/{id}/retry` - 重试失败消息
 
+**CQ码解析API** (`/api/cqcode`):
+- POST `/parse` - 解析CQ码
+- POST `/strip` - 去除CQ码
+- GET `/types` - 获取CQ码类型列表
+- GET `/patterns` - 获取预定义CQ码模式
+- POST `/patterns/validate` - 验证CQ码正则模式
+
+**消息统计API** (`/api/statistics`):
+- POST `/calculate` - 计算消息统计
+- POST `/format` - 格式化统计回复
+
+### API使用示例
+
+**解析CQ码**:
+```bash
+curl -X POST http://localhost:8080/api/cqcode/parse \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Hello[CQ:face,id=123]世界[CQ:image,file=abc.jpg]"}'
+
+# 返回: [
+#   {"type": "face", "params": {"id": "123"}, "label": "表情", "unit": "个"},
+#   {"type": "image", "params": {"file": "abc.jpg"}, "label": "图片", "unit": "张"}
+# ]
+```
+
+**计算消息统计**:
+```bash
+curl -X POST http://localhost:8080/api/statistics/calculate \
+  -H "Content-Type: application/json" \
+  -d '{"message": "你好世界[CQ:face,id=123][CQ:image,file=abc.jpg]"}'
+
+# 返回: {
+#   "characterCount": 4,
+#   "cqCodeCounts": {"face": 1, "image": 1}
+# }
+```
+
+**检查NapCat健康状态**:
+```bash
+curl http://localhost:8080/actuator/health/napCatHealthIndicator
+
+# 返回: {
+#   "status": "UP",
+#   "details": {
+#     "status": "NapCat connection healthy",
+#     "successRate": "95.33%",
+#     "totalCalls": 150
+#   }
+# }
+```
+
+**查看Prometheus指标**:
+```bash
+curl http://localhost:8080/actuator/prometheus | grep cqcode
+
+# 返回:
+# cqcode_parse_total{component="cqcode-parser"} 1250.0
+# cqcode_parse_duration_seconds_sum{component="cqcode-parser"} 10.5
+# cqcode_cache_hits_total{component="cqcode-parser"} 950.0
+```
+
+更多API示例请参考: [quickstart.md](specs/002-napcat-cqcode-parser/quickstart.md#-api-examples-curl)
+
 ---
 
 ## 🔐 安全特性
@@ -424,6 +506,31 @@ VITE_API_BASE_URL=http://localhost:8080/api
 - CSV导出
 - 表单验证
 - 友好的错误提示
+
+### CQ码解析与统计
+- OneBot 11协议CQ码解析 (支持face、image、at、reply等)
+- Unicode字符精确计数 (支持中英文、emoji)
+- 实时消息统计 (字数、各类CQ码数量)
+- CQ码模式匹配 (支持正则表达式)
+- 统计回复格式化 (仅显示非零项)
+
+### NapCat API集成
+- JSON-RPC 2.0协议支持
+- WebSocket主通道 + HTTP备用通道
+- 请求-响应关联 (UUID tracking)
+- 超时处理 (可配置,默认10秒)
+- 群信息查询、成员管理、消息操作
+
+### 监控与可观测性
+- **Prometheus指标**:
+  - CQ码解析性能 (计数、耗时、缓存命中率)
+  - NapCat API调用统计 (成功率、失败率、超时率)
+  - 规则引擎匹配性能
+- **健康检查** (Spring Boot Actuator):
+  - NapCat连接健康度 (基于API成功率)
+  - 数据库连接状态
+  - Redis连接状态
+- **结构化日志**: 包含requestId、action、executionTime、status
 
 ---
 
