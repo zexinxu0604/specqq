@@ -161,12 +161,21 @@ import { ref, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
 import { CircleCheck, Promotion } from '@element-plus/icons-vue'
-import { validatePattern as validatePatternApi, testRuleMatch } from '@/api/modules/rule.api'
+import { validatePattern as validatePatternApi, testRuleMatch, checkNameUnique as checkNameUniqueApi } from '@/api/modules/rule.api'
 import { MatchType, MatchTypeLabels } from '@/types/rule'
 import type { CreateRuleRequest, UpdateRuleRequest, TestRuleResponse, ValidatePatternResponse } from '@/types/rule'
 import CQCodeSelector from '@/components/CQCodeSelector.vue'
 import CQCodePreview from '@/components/CQCodePreview.vue'
 import type { CQCodePattern } from '@/types/cqcode'
+
+// Simple debounce helper function
+function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
+  let timeout: ReturnType<typeof setTimeout> | null = null
+  return ((...args: Parameters<T>) => {
+    if (timeout) clearTimeout(timeout)
+    timeout = setTimeout(() => func(...args), wait)
+  }) as T
+}
 
 interface Props {
   modelValue: CreateRuleRequest | UpdateRuleRequest
@@ -240,11 +249,35 @@ const priorityMarks = {
   100: '最高'
 }
 
+// 规则名称唯一性验证（防抖）
+const validateNameUnique = debounce(async (_rule: any, value: string, callback: any) => {
+  if (!value) {
+    callback()
+    return
+  }
+
+  try {
+    const excludeId = props.isEdit && (formData as any).id ? (formData as any).id : undefined
+    const response = await checkNameUniqueApi(value, excludeId)
+
+    if (response.data && !response.data.unique) {
+      callback(new Error('规则名称已存在'))
+    } else {
+      callback()
+    }
+  } catch (error: any) {
+    console.error('Failed to check name uniqueness:', error)
+    // On error, allow the form to proceed (backend will validate)
+    callback()
+  }
+}, 500) // 500ms debounce
+
 // 表单验证规则
 const formRules: FormRules = {
   name: [
     { required: true, message: '请输入规则名称', trigger: 'blur' },
-    { min: 2, max: 50, message: '规则名称长度在2-50个字符', trigger: 'blur' }
+    { min: 2, max: 50, message: '规则名称长度在2-50个字符', trigger: 'blur' },
+    { validator: validateNameUnique, trigger: 'blur' }
   ],
   matchType: [
     { required: true, message: '请选择匹配类型', trigger: 'change' }
@@ -316,10 +349,10 @@ const handlePatternBlur = () => {
   }
 }
 
-// 规则名称唯一性检查
+// 规则名称唯一性检查（已通过表单验证规则实现）
 const checkNameUnique = async () => {
-  // TODO: 实现异步唯一性验证
-  // 暂时跳过，由后端统一处理
+  // This function is no longer needed as validation is handled by form rules
+  // Kept for backward compatibility with the template @blur event
 }
 
 // 测试规则

@@ -8,6 +8,7 @@ import com.specqq.chatbot.dto.MessageReplyDTO;
 import com.specqq.chatbot.dto.NapCatMessageDTO;
 import com.specqq.chatbot.entity.ChatClient;
 import com.specqq.chatbot.enums.ProtocolType;
+import com.specqq.chatbot.websocket.NapCatWebSocketHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.hc.client5.http.async.methods.SimpleHttpRequest;
@@ -17,9 +18,12 @@ import org.apache.hc.client5.http.impl.async.CloseableHttpAsyncClient;
 import org.apache.hc.client5.http.impl.async.HttpAsyncClients;
 import org.apache.hc.core5.concurrent.FutureCallback;
 import org.apache.hc.core5.http.ContentType;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import org.springframework.web.socket.TextMessage;
+import org.springframework.web.socket.WebSocketSession;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -53,8 +57,15 @@ public class NapCatAdapter implements ClientAdapter {
 
     private CloseableHttpAsyncClient httpClient;
 
+    // WebSocket handler (optional - may be null if WebSocket not configured)
+    @Autowired(required = false)
+    private NapCatWebSocketHandler webSocketHandler;
+
     // Request-response correlation map for API calls
     private final Map<String, CompletableFuture<ApiCallResponseDTO>> pendingRequests = new ConcurrentHashMap<>();
+
+    // WebSocket response handler map (requestId -> CompletableFuture)
+    private final Map<String, CompletableFuture<ApiCallResponseDTO>> webSocketPendingRequests = new ConcurrentHashMap<>();
 
     // T104: Metrics for API call performance
     private final java.util.concurrent.atomic.AtomicLong totalApiCalls = new java.util.concurrent.atomic.AtomicLong(0);
@@ -188,70 +199,42 @@ public class NapCatAdapter implements ClientAdapter {
 
     @Override
     public CompletableFuture<Boolean> sendReply(MessageReplyDTO reply) {
-        CompletableFuture<Boolean> future = new CompletableFuture<>();
+        // 使用统一的 WebSocket 优先调用策略
+        Map<String, Object> params = new HashMap<>();
+        params.put("group_id", Long.parseLong(reply.getGroupId()));
+        params.put("message", reply.getReplyContent());
 
-        try {
-            // 构造NapCat API请求体
-            Map<String, Object> requestBody = new HashMap<>();
-            requestBody.put("group_id", Long.parseLong(reply.getGroupId()));
-            requestBody.put("message", reply.getReplyContent());
-
-            String jsonBody = objectMapper.writeValueAsString(requestBody);
-
-            // 构造HTTP POST请求
-            SimpleHttpRequest request = SimpleRequestBuilder.post(napCatHttpUrl + "/send_group_msg")
-                .setHeader("Authorization", "Bearer " + accessToken)
-                .setHeader("Content-Type", "application/json")
-                .setBody(jsonBody, ContentType.APPLICATION_JSON)
-                .build();
-
-            // 异步发送请求
-            httpClient.execute(request, new FutureCallback<SimpleHttpResponse>() {
-                @Override
-                public void completed(SimpleHttpResponse response) {
-                    int statusCode = response.getCode();
-                    if (statusCode >= 200 && statusCode < 300) {
-                        log.info("Reply sent successfully: groupId={}, statusCode={}", reply.getGroupId(), statusCode);
-                        future.complete(true);
-                    } else {
-                        log.error("Reply failed: groupId={}, statusCode={}, body={}",
-                            reply.getGroupId(), statusCode, response.getBodyText());
-                        future.complete(false);
-                    }
+        return callApiWithFallback("send_group_msg", params)
+            .thenApply(response -> {
+                if (response != null && response.getRetcode() == 0) {
+                    log.info("Reply sent successfully via unified API: groupId={}", reply.getGroupId());
+                    return true;
+                } else {
+                    log.error("Reply failed via unified API: groupId={}, retcode={}, message={}",
+                        reply.getGroupId(),
+                        response != null ? response.getRetcode() : "null",
+                        response != null ? response.getMessage() : "null");
+                    return false;
                 }
-
-                @Override
-                public void failed(Exception ex) {
-                    log.error("HTTP request failed: groupId={}", reply.getGroupId(), ex);
-                    future.complete(false);
-                }
-
-                @Override
-                public void cancelled() {
-                    log.warn("HTTP request cancelled: groupId={}", reply.getGroupId());
-                    future.complete(false);
-                }
+            })
+            .exceptionally(ex -> {
+                log.error("Failed to send reply via unified API: groupId={}", reply.getGroupId(), ex);
+                return false;
             });
-
-        } catch (Exception e) {
-            log.error("Failed to send reply: groupId={}", reply.getGroupId(), e);
-            future.complete(false);
-        }
-
-        return future;
     }
 
     /**
-     * Call NapCat API with generic action and parameters
+     * Call NapCat API via HTTP
      *
      * <p>T094-T098: JSON-RPC 2.0 implementation with request-response correlation</p>
+     * <p>Note: This is the HTTP implementation. Use callApiWithFallback() for WebSocket-first strategy.</p>
      *
      * @param action NapCat API action (e.g., "get_group_info")
      * @param params API parameters
      * @return API response
      * @throws TimeoutException if request times out after 10 seconds
      */
-    public CompletableFuture<ApiCallResponseDTO> callApi(String action, Map<String, Object> params) {
+    private CompletableFuture<ApiCallResponseDTO> callApiViaHttp(String action, Map<String, Object> params) {
         long startTime = System.currentTimeMillis();
         String requestId = UUID.randomUUID().toString();
 
@@ -415,15 +398,140 @@ public class NapCatAdapter implements ClientAdapter {
     }
 
     /**
-     * Call API with automatic HTTP fallback
+     * Call API with WebSocket-first strategy and automatic HTTP fallback
      *
-     * <p>T099-T102: Try WebSocket first, fallback to HTTP on timeout/error</p>
-     * <p>Note: WebSocket not implemented yet, currently uses HTTP directly</p>
+     * <p>This is the unified entry point for all NapCat API calls.</p>
+     * <p>Strategy: WebSocket (if available) → HTTP (fallback)</p>
+     *
+     * @param action NapCat API action (e.g., "get_group_info", "send_group_msg")
+     * @param params API parameters
+     * @return API response wrapped in CompletableFuture
      */
     public CompletableFuture<ApiCallResponseDTO> callApiWithFallback(String action, Map<String, Object> params) {
-        // TODO: Implement WebSocket call first, then fallback to HTTP
-        // For now, just use HTTP directly
-        return callApi(action, params);
+        // Try WebSocket first if available
+        if (isWebSocketAvailable()) {
+            return callApiViaWebSocket(action, params)
+                .exceptionally(wsError -> {
+                    log.warn("WebSocket call failed for action '{}', falling back to HTTP: {}",
+                            action, wsError.getMessage());
+                    // Fallback to HTTP on WebSocket failure
+                    try {
+                        return callApiViaHttp(action, params).join();
+                    } catch (Exception httpError) {
+                        log.error("HTTP fallback also failed for action '{}'", action, httpError);
+                        throw new RuntimeException("Both WebSocket and HTTP failed for action: " + action, httpError);
+                    }
+                });
+        }
+
+        // Use HTTP directly if WebSocket not available
+        log.debug("WebSocket not available for action '{}', using HTTP directly", action);
+        return callApiViaHttp(action, params);
+    }
+
+    /**
+     * Check if WebSocket is available and connected
+     *
+     * @return true if WebSocket session exists and is open
+     */
+    private boolean isWebSocketAvailable() {
+        if (webSocketHandler == null) {
+            log.debug("WebSocket handler not configured");
+            return false;
+        }
+
+        boolean connected = webSocketHandler.isConnected();
+        log.debug("WebSocket availability check: connected={}", connected);
+        return connected;
+    }
+
+    /**
+     * Call API via WebSocket
+     *
+     * <p>Sends JSON-RPC 2.0 request via WebSocket and returns CompletableFuture</p>
+     *
+     * @param action NapCat API action
+     * @param params API parameters
+     * @return CompletableFuture that completes when WebSocket response arrives
+     */
+    private CompletableFuture<ApiCallResponseDTO> callApiViaWebSocket(String action, Map<String, Object> params) {
+        long startTime = System.currentTimeMillis();
+        String requestId = UUID.randomUUID().toString();
+
+        log.debug("WebSocket API call initiated: requestId={}, action={}", requestId, action);
+
+        CompletableFuture<ApiCallResponseDTO> future = new CompletableFuture<>();
+
+        try {
+            // 1. Create JSON-RPC 2.0 request
+            ApiCallRequestDTO request = new ApiCallRequestDTO();
+            request.setJsonrpc("2.0");
+            request.setId(requestId);
+            request.setAction(action);
+            request.setParams(params != null ? params : new HashMap<>());
+
+            String jsonMessage = objectMapper.writeValueAsString(request);
+
+            // 2. Register CompletableFuture in pending requests map
+            webSocketPendingRequests.put(requestId, future);
+
+            // 3. Send request via WebSocket
+            webSocketHandler.sendMessage(jsonMessage);
+
+            log.debug("WebSocket message sent: requestId={}, action={}", requestId, action);
+
+            // 4. Set timeout to auto-complete exceptionally if no response
+            future.orTimeout(httpTimeout, TimeUnit.MILLISECONDS)
+                .exceptionally(throwable -> {
+                    long executionTime = System.currentTimeMillis() - startTime;
+                    webSocketPendingRequests.remove(requestId);
+
+                    if (throwable instanceof java.util.concurrent.TimeoutException) {
+                        String errorMessage = String.format(
+                            "WebSocket API call timeout for action '%s' after %dms",
+                            action, httpTimeout);
+                        log.warn("WebSocket timeout: requestId={}, action={}, timeout={}ms",
+                            requestId, action, httpTimeout);
+                        throw new RuntimeException(errorMessage, throwable);
+                    }
+
+                    throw new RuntimeException("WebSocket API call failed: " + action, throwable);
+                });
+
+        } catch (Exception e) {
+            long executionTime = System.currentTimeMillis() - startTime;
+            webSocketPendingRequests.remove(requestId);
+
+            String errorMessage = String.format(
+                "Failed to send WebSocket API request for action '%s': %s",
+                action, e.getMessage());
+            log.error("WebSocket API request error: requestId={}, action={}, executionTime={}ms",
+                requestId, action, executionTime, e);
+
+            future.completeExceptionally(new RuntimeException(errorMessage, e));
+        }
+
+        return future;
+    }
+
+    /**
+     * Handle WebSocket API response
+     *
+     * <p>Called by WebSocket message handler when API response is received</p>
+     *
+     * @param requestId Request ID from JSON-RPC response
+     * @param response  API response data
+     */
+    public void handleWebSocketResponse(String requestId, ApiCallResponseDTO response) {
+        CompletableFuture<ApiCallResponseDTO> future = webSocketPendingRequests.remove(requestId);
+
+        if (future != null) {
+            log.debug("WebSocket response received: requestId={}, retcode={}",
+                requestId, response.getRetcode());
+            future.complete(response);
+        } else {
+            log.warn("Received WebSocket response for unknown requestId: {}", requestId);
+        }
     }
 
     /**
@@ -481,6 +589,44 @@ public class NapCatAdapter implements ClientAdapter {
         params.put("group_id", groupId);
         params.put("messages", messages);
         return callApiWithFallback("send_forward_msg", params);
+    }
+
+    /**
+     * Get bot login information
+     *
+     * <p>Retrieves bot's QQ ID and other login details for bot self-ID filtering</p>
+     *
+     * @return API response containing user_id (bot's QQ ID), nickname, etc.
+     */
+    public CompletableFuture<ApiCallResponseDTO> getLoginInfo() {
+        return callApiWithFallback("get_login_info", Collections.emptyMap());
+    }
+
+    /**
+     * Get group list
+     *
+     * <p>Retrieves list of all groups the bot is in</p>
+     *
+     * @return API response containing list of groups with group_id, group_name, member_count
+     */
+    public CompletableFuture<ApiCallResponseDTO> getGroupList() {
+        return callApiWithFallback("get_group_list", Collections.emptyMap());
+    }
+
+    /**
+     * Send group message
+     *
+     * <p>Sends a message to a group (used for message retry functionality)</p>
+     *
+     * @param groupId Group ID to send message to
+     * @param message Message content to send
+     * @return API response containing message_id of sent message
+     */
+    public CompletableFuture<ApiCallResponseDTO> sendGroupMessage(Long groupId, String message) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("group_id", groupId);
+        params.put("message", message);
+        return callApiWithFallback("send_group_msg", params);
     }
 
     /**

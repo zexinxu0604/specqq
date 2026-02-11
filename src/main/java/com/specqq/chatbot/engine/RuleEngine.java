@@ -1,5 +1,7 @@
 package com.specqq.chatbot.engine;
 
+import com.specqq.chatbot.adapter.NapCatAdapter;
+import com.specqq.chatbot.dto.ApiCallResponseDTO;
 import com.specqq.chatbot.dto.MessageReceiveDTO;
 import com.specqq.chatbot.entity.GroupChat;
 import com.specqq.chatbot.entity.MessageRule;
@@ -13,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 规则引擎
@@ -35,12 +38,13 @@ public class RuleEngine {
     private final ContainsMatcher containsMatcher;
     private final RegexMatcher regexMatcher;
     private final StatisticsMatcher statisticsMatcher;
+    private final NapCatAdapter napCatAdapter;
 
     // 匹配器映射
     private final Map<MessageRule.MatchType, RuleMatcher> matcherMap = new ConcurrentHashMap<>();
 
     // Bot self-ID cache for filtering bot's own messages
-    private String botSelfId = null;
+    private volatile String botSelfId = null;
 
     /**
      * 初始化匹配器映射
@@ -66,9 +70,12 @@ public class RuleEngine {
         long startTime = System.currentTimeMillis();
 
         try {
-            // 0. Filter bot's own messages to prevent infinite loops
-            // TODO: Implement bot self-ID retrieval via get_login_info API
-            // For now, this check is a placeholder for T040 implementation
+            // 0. Initialize bot self-ID on first message
+            if (botSelfId == null) {
+                initializeBotSelfId();
+            }
+
+            // Filter bot's own messages to prevent infinite loops
             if (isBotMessage(message)) {
                 log.debug("Ignoring bot's own message: userId={}", message.getUserId());
                 return Optional.empty();
@@ -143,10 +150,46 @@ public class RuleEngine {
     }
 
     /**
+     * Initialize bot self-ID by calling NapCat get_login_info API
+     *
+     * <p>Called on first message to retrieve bot's QQ ID for message filtering</p>
+     */
+    private synchronized void initializeBotSelfId() {
+        if (botSelfId != null) {
+            return; // Already initialized
+        }
+
+        try {
+            log.info("Initializing bot self-ID via get_login_info API...");
+            ApiCallResponseDTO response = napCatAdapter.getLoginInfo()
+                .get(5, TimeUnit.SECONDS);
+
+            if (response != null && response.getRetcode() == 0 && response.getData() != null) {
+                Map<String, Object> data = response.getData();
+                Object userIdObj = data.get("user_id");
+
+                if (userIdObj != null) {
+                    // Convert to String for consistent comparison
+                    botSelfId = String.valueOf(((Number) userIdObj).longValue());
+                    log.info("Bot self-ID initialized successfully: {}", botSelfId);
+                } else {
+                    log.warn("Bot self-ID not found in get_login_info response: {}", data);
+                }
+            } else {
+                log.warn("Failed to retrieve bot self-ID: retcode={}, message={}",
+                    response != null ? response.getRetcode() : "null",
+                    response != null ? response.getMessage() : "null");
+            }
+        } catch (Exception e) {
+            log.error("Failed to initialize bot self-ID", e);
+        }
+    }
+
+    /**
      * Check if message is from the bot itself
      *
      * <p>Filters bot's own messages to prevent infinite loops in statistics rules.
-     * Bot self-ID is retrieved via get_login_info API on startup and cached.</p>
+     * Bot self-ID is retrieved via get_login_info API on first message and cached.</p>
      *
      * @param message Message to check
      * @return true if message is from bot, false otherwise
@@ -155,13 +198,6 @@ public class RuleEngine {
         if (message == null || message.getUserId() == null) {
             return false;
         }
-
-        // TODO: Implement bot self-ID retrieval via NapCat get_login_info API
-        // For now, return false (no filtering) - will be implemented in T040
-        // Expected implementation:
-        // 1. Call get_login_info API on first message
-        // 2. Cache bot's QQ ID in botSelfId field
-        // 3. Compare message.getUserId() with cached botSelfId
 
         if (botSelfId == null) {
             // Bot self-ID not yet retrieved

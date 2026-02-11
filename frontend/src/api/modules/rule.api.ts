@@ -88,3 +88,13 @@ export function batchDeleteRules(ids: number[]) {
     data: ids
   })
 }
+
+/**
+ * 检查规则名称唯一性
+ */
+export function checkNameUnique(name: string, excludeId?: number) {
+  return get<{ unique: boolean }>('/api/rules/check-name', {
+    name,
+    excludeId
+  })
+}

@@ -1,10 +1,14 @@
 package com.specqq.chatbot.websocket;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.specqq.chatbot.adapter.ClientAdapter;
+import com.specqq.chatbot.adapter.NapCatAdapter;
+import com.specqq.chatbot.dto.ApiCallResponseDTO;
 import com.specqq.chatbot.dto.MessageReceiveDTO;
 import com.specqq.chatbot.engine.MessageRouter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -17,6 +21,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import jakarta.annotation.PreDestroy;
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -40,6 +45,11 @@ public class NapCatWebSocketHandler extends TextWebSocketHandler {
     private final WebSocketClient webSocketClient;
     private final ClientAdapter clientAdapter;
     private final MessageRouter messageRouter;
+    private final ObjectMapper objectMapper;
+
+    // NapCatAdapter for handling API responses (optional - may be null during initialization)
+    @Autowired(required = false)
+    private NapCatAdapter napCatAdapter;
 
     @Value("${napcat.websocket.url}")
     private String napCatWebSocketUrl;
@@ -104,6 +114,50 @@ public class NapCatWebSocketHandler extends TextWebSocketHandler {
         log.debug("Received WebSocket message: {}", payload);
 
         try {
+            // 尝试解析为JSON对象以判断消息类型
+            Map<String, Object> jsonMap = objectMapper.readValue(payload, Map.class);
+
+            // 检查是否是API响应 (包含 id, retcode, status 等字段)
+            if (jsonMap.containsKey("id") && (jsonMap.containsKey("retcode") || jsonMap.containsKey("status"))) {
+                // 这是API调用响应
+                handleApiResponse(payload);
+            } else if (jsonMap.containsKey("post_type")) {
+                // 这是事件消息 (群消息、通知等)
+                handleEventMessage(payload);
+            } else {
+                log.debug("Unknown WebSocket message type: {}", payload);
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to handle WebSocket message", e);
+        }
+    }
+
+    /**
+     * 处理API响应
+     */
+    private void handleApiResponse(String payload) {
+        try {
+            ApiCallResponseDTO response = objectMapper.readValue(payload, ApiCallResponseDTO.class);
+
+            if (napCatAdapter != null && response.getId() != null) {
+                log.debug("Routing API response to NapCatAdapter: requestId={}, retcode={}",
+                    response.getId(), response.getRetcode());
+                napCatAdapter.handleWebSocketResponse(response.getId(), response);
+            } else {
+                log.debug("API response received but no handler: requestId={}", response.getId());
+            }
+
+        } catch (Exception e) {
+            log.error("Failed to parse API response", e);
+        }
+    }
+
+    /**
+     * 处理事件消息 (群消息、通知等)
+     */
+    private void handleEventMessage(String payload) {
+        try {
             // 解析消息
             MessageReceiveDTO receivedMessage = clientAdapter.parseMessage(payload);
 
@@ -113,7 +167,7 @@ public class NapCatWebSocketHandler extends TextWebSocketHandler {
             }
 
         } catch (Exception e) {
-            log.error("Failed to handle WebSocket message", e);
+            log.error("Failed to handle event message", e);
         }
     }
 
@@ -194,6 +248,37 @@ public class NapCatWebSocketHandler extends TextWebSocketHandler {
                 log.error("Reconnect attempt {} failed", attempts + 1, e);
             }
         }, delaySeconds, TimeUnit.SECONDS);
+    }
+
+    /**
+     * 检查WebSocket是否已连接
+     *
+     * @return true if connected
+     */
+    public boolean isConnected() {
+        return session != null && session.isOpen();
+    }
+
+    /**
+     * 获取当前WebSocket会话
+     *
+     * @return WebSocket session or null if not connected
+     */
+    public WebSocketSession getSession() {
+        return session;
+    }
+
+    /**
+     * 发送消息到NapCat
+     *
+     * @param message 消息内容
+     * @throws Exception if send fails
+     */
+    public void sendMessage(String message) throws Exception {
+        if (session == null || !session.isOpen()) {
+            throw new IllegalStateException("WebSocket not connected");
+        }
+        session.sendMessage(new TextMessage(message));
     }
 
     @PreDestroy

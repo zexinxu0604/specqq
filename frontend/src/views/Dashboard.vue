@@ -60,6 +60,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { List, ChatDotRound, ChatLineRound, SuccessFilled } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { listRules } from '@/api/modules/rule.api'
+import { listGroups } from '@/api/modules/group.api'
+import { getLogStats } from '@/api/modules/log.api'
 
 const stats = ref({
   totalRules: 0,
@@ -68,15 +72,42 @@ const stats = ref({
   successRate: 0
 })
 
-onMounted(() => {
-  // TODO: 加载统计数据
-  stats.value = {
-    totalRules: 12,
-    totalGroups: 5,
-    todayMessages: 156,
-    successRate: 98.5
-  }
+const loading = ref(false)
+
+onMounted(async () => {
+  await loadStatistics()
 })
+
+const loadStatistics = async () => {
+  loading.value = true
+  try {
+    // Load statistics from backend APIs in parallel
+    const [rulesResponse, groupsResponse, logsStatsResponse] = await Promise.all([
+      listRules({ page: 1, size: 1 }), // Get total count
+      listGroups({ page: 1, size: 1 }), // Get total count
+      getLogStats() // Get message statistics
+    ])
+
+    stats.value = {
+      totalRules: rulesResponse.data?.total || 0,
+      totalGroups: groupsResponse.data?.total || 0,
+      todayMessages: logsStatsResponse.data?.totalMessages || 0,
+      successRate: logsStatsResponse.data?.successRate || 0
+    }
+  } catch (error: any) {
+    console.error('Failed to load statistics:', error)
+    ElMessage.error('加载统计数据失败: ' + (error.message || '未知错误'))
+    // Use default values on error
+    stats.value = {
+      totalRules: 0,
+      totalGroups: 0,
+      todayMessages: 0,
+      successRate: 0
+    }
+  } finally {
+    loading.value = false
+  }
+}
 </script>
 
 <style scoped lang="scss">

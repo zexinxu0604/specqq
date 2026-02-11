@@ -264,4 +264,36 @@ public class RuleController {
         boolean matched = ruleService.testRuleMatch(matchType, pattern, message);
         return Result.success(matched ? "匹配成功" : "未匹配", matched);
     }
+
+    /**
+     * 检查规则名称唯一性
+     */
+    @GetMapping("/check-name")
+    @Operation(summary = "检查规则名称唯一性", description = "用于前端表单异步验证规则名称是否已存在")
+    public Result<java.util.Map<String, Boolean>> checkNameUnique(
+        @Parameter(description = "规则名称") @RequestParam String name,
+        @Parameter(description = "排除的规则ID（编辑时使用）") @RequestParam(required = false) Long excludeId
+    ) {
+        log.debug("检查规则名称唯一性: name={}, excludeId={}", name, excludeId);
+
+        boolean exists;
+        if (excludeId != null) {
+            // 编辑时，排除自身
+            MessageRule existing = ruleService.getRuleById(excludeId);
+            if (existing != null && existing.getName().equals(name)) {
+                // 名称未改变，视为唯一
+                exists = false;
+            } else {
+                exists = ruleService.existsByName(name);
+            }
+        } else {
+            // 新建时，直接检查是否存在
+            exists = ruleService.existsByName(name);
+        }
+
+        java.util.Map<String, Boolean> result = new java.util.HashMap<>();
+        result.put("unique", !exists);
+
+        return Result.success(result);
+    }
 }

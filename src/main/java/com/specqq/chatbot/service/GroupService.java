@@ -1,9 +1,12 @@
 package com.specqq.chatbot.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.specqq.chatbot.adapter.NapCatAdapter;
+import com.specqq.chatbot.dto.ApiCallResponseDTO;
 import com.specqq.chatbot.entity.GroupChat;
 import com.specqq.chatbot.entity.GroupRuleConfig;
 import com.specqq.chatbot.entity.MessageLog;
@@ -22,6 +25,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 群聊服务
@@ -36,6 +40,7 @@ public class GroupService extends ServiceImpl<GroupChatMapper, GroupChat> {
     private final GroupChatMapper groupChatMapper;
     private final GroupRuleConfigMapper groupRuleConfigMapper;
     private final MessageLogMapper messageLogMapper;
+    private final NapCatAdapter napCatAdapter;
 
     /**
      * 根据群聊平台ID查询群聊
@@ -394,9 +399,43 @@ public class GroupService extends ServiceImpl<GroupChatMapper, GroupChat> {
             throw new IllegalArgumentException("群聊不存在: " + groupId);
         }
 
-        // TODO: 实际实现需要调用客户端API获取最新信息
-        // 这里仅作为占位符
-        log.info("Synced group info: id={}, groupId={}", groupId, group.getGroupId());
+        try {
+            // Call NapCat API to get latest group info
+            Long platformGroupId = Long.parseLong(group.getGroupId());
+            ApiCallResponseDTO response = napCatAdapter.getGroupInfo(platformGroupId)
+                .get(10, TimeUnit.SECONDS);
+
+            if (response != null && response.getRetcode() == 0 && response.getData() != null) {
+                Map<String, Object> data = response.getData();
+
+                // Update group information from NapCat response
+                String groupName = (String) data.get("group_name");
+                Object memberCountObj = data.get("member_count");
+
+                if (groupName != null && !groupName.isEmpty()) {
+                    group.setGroupName(groupName);
+                }
+
+                if (memberCountObj != null) {
+                    Integer memberCount = ((Number) memberCountObj).intValue();
+                    group.setMemberCount(memberCount);
+                }
+
+                groupChatMapper.updateById(group);
+                log.info("Synced group info successfully: id={}, groupId={}, name={}, members={}",
+                    groupId, group.getGroupId(), groupName, memberCountObj);
+            } else {
+                String errorMsg = String.format("Failed to sync group info from NapCat: retcode=%d, message=%s",
+                    response != null ? response.getRetcode() : -1,
+                    response != null ? response.getMessage() : "null response");
+                log.error(errorMsg);
+                throw new RuntimeException(errorMsg);
+            }
+        } catch (Exception e) {
+            log.error("Failed to sync group info: groupId={}", groupId, e);
+            throw new RuntimeException("同步群聊信息失败: " + e.getMessage(), e);
+        }
+
         return group;
     }
 
@@ -410,14 +449,102 @@ public class GroupService extends ServiceImpl<GroupChatMapper, GroupChat> {
     public Map<String, Object> batchImportGroups(Long clientId) {
         Map<String, Object> result = new HashMap<>();
 
-        // TODO: 实际实现需要调用客户端API获取群聊列表
-        // 这里仅作为占位符
-        result.put("clientId", clientId);
-        result.put("imported", 0);
-        result.put("skipped", 0);
-        result.put("message", "批量导入功能待实现");
+        try {
+            // Call NapCat API to get group list
+            ApiCallResponseDTO response = napCatAdapter.getGroupList()
+                .get(10, TimeUnit.SECONDS);
 
-        log.info("Batch import groups: clientId={}", clientId);
+            if (response == null || response.getRetcode() != 0 || response.getData() == null) {
+                result.put("clientId", clientId);
+                result.put("imported", 0);
+                result.put("skipped", 0);
+                result.put("message", "无法获取群聊列表: " +
+                    (response != null ? response.getMessage() : "null response"));
+                log.warn("Failed to get group list from NapCat: {}", result.get("message"));
+                return result;
+            }
+
+            // Parse group list from response data
+            Object dataObj = response.getData();
+            List<Map<String, Object>> groupList;
+
+            if (dataObj instanceof List) {
+                groupList = (List<Map<String, Object>>) dataObj;
+            } else if (dataObj instanceof Map) {
+                // Some NapCat versions may return data wrapped in an object
+                Map<String, Object> dataMap = (Map<String, Object>) dataObj;
+                Object listObj = dataMap.get("groups");
+                if (listObj instanceof List) {
+                    groupList = (List<Map<String, Object>>) listObj;
+                } else {
+                    result.put("clientId", clientId);
+                    result.put("imported", 0);
+                    result.put("skipped", 0);
+                    result.put("message", "群聊列表格式不正确");
+                    return result;
+                }
+            } else {
+                result.put("clientId", clientId);
+                result.put("imported", 0);
+                result.put("skipped", 0);
+                result.put("message", "群聊列表格式不正确");
+                return result;
+            }
+
+            int imported = 0;
+            int skipped = 0;
+
+            for (Map<String, Object> groupData : groupList) {
+                try {
+                    Object groupIdObj = groupData.get("group_id");
+                    if (groupIdObj == null) {
+                        continue;
+                    }
+
+                    Long platformGroupId = ((Number) groupIdObj).longValue();
+                    String groupName = (String) groupData.get("group_name");
+                    Object memberCountObj = groupData.get("member_count");
+                    Integer memberCount = memberCountObj != null ? ((Number) memberCountObj).intValue() : 0;
+
+                    // Check if group already exists
+                    QueryWrapper<GroupChat> queryWrapper = new QueryWrapper<>();
+                    queryWrapper.eq("group_id", String.valueOf(platformGroupId));
+                    GroupChat existing = groupChatMapper.selectOne(queryWrapper);
+
+                    if (existing == null) {
+                        // Create new group
+                        GroupChat newGroup = new GroupChat();
+                        newGroup.setClientId(clientId);
+                        newGroup.setGroupId(String.valueOf(platformGroupId));
+                        newGroup.setGroupName(groupName != null ? groupName : "Unknown Group");
+                        newGroup.setMemberCount(memberCount);
+                        newGroup.setEnabled(true);
+                        groupChatMapper.insert(newGroup);
+                        imported++;
+                        log.debug("Imported group: groupId={}, name={}", platformGroupId, groupName);
+                    } else {
+                        skipped++;
+                        log.debug("Skipped existing group: groupId={}", platformGroupId);
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to import group: {}", groupData, e);
+                }
+            }
+
+            result.put("clientId", clientId);
+            result.put("imported", imported);
+            result.put("skipped", skipped);
+            result.put("message", String.format("成功导入 %d 个群聊，跳过 %d 个已存在群聊", imported, skipped));
+            log.info("Batch import groups completed: clientId={}, imported={}, skipped={}", clientId, imported, skipped);
+
+        } catch (Exception e) {
+            log.error("Failed to batch import groups: clientId={}", clientId, e);
+            result.put("clientId", clientId);
+            result.put("imported", 0);
+            result.put("skipped", 0);
+            result.put("message", "批量导入失败: " + e.getMessage());
+        }
+
         return result;
     }
 }

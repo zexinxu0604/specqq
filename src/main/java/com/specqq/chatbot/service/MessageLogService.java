@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.specqq.chatbot.adapter.NapCatAdapter;
+import com.specqq.chatbot.dto.ApiCallResponseDTO;
 import com.specqq.chatbot.entity.MessageLog;
 import com.specqq.chatbot.mapper.MessageLogMapper;
 import lombok.RequiredArgsConstructor;
@@ -21,6 +23,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -38,6 +41,7 @@ import java.util.stream.Collectors;
 public class MessageLogService extends ServiceImpl<MessageLogMapper, MessageLog> {
 
     private final MessageLogMapper messageLogMapper;
+    private final NapCatAdapter napCatAdapter;
 
     // 批量插入缓冲区
     private final List<MessageLog> batchBuffer = new ArrayList<>();
@@ -599,16 +603,69 @@ public class MessageLogService extends ServiceImpl<MessageLogMapper, MessageLog>
      */
     @Async
     public void retryFailedMessage(Long logId) {
-        MessageLog log = messageLogMapper.selectById(logId);
-        if (log == null) {
+        MessageLog messageLog = messageLogMapper.selectById(logId);
+        if (messageLog == null) {
+            log.warn("Message log not found for retry: logId={}", logId);
             return;
         }
 
-        // TODO: 实际实现需要重新调用消息发送逻辑
-        // 这里仅作为占位符
-        log.setSendStatus(MessageLog.SendStatus.PENDING);
-        messageLogMapper.updateById(log);
+        // Only retry failed or skipped messages
+        if (messageLog.getSendStatus() != MessageLog.SendStatus.FAILED &&
+            messageLog.getSendStatus() != MessageLog.SendStatus.SKIPPED) {
+            log.warn("Message log is not in failed/skipped state, cannot retry: logId={}, status={}",
+                logId, messageLog.getSendStatus());
+            return;
+        }
 
-        this.log.info("Retry failed message: logId={}, messageId={}", logId, log.getMessageId());
+        try {
+            // Get original message details
+            Long groupId = messageLog.getGroupId();
+            String replyContent = messageLog.getResponseContent();
+
+            if (replyContent == null || replyContent.isEmpty()) {
+                log.warn("No reply content to retry: logId={}", logId);
+                messageLog.setSendStatus(MessageLog.SendStatus.FAILED);
+                messageLog.setErrorMessage("无回复内容可重试");
+                messageLogMapper.updateById(messageLog);
+                return;
+            }
+
+            log.info("Retrying failed message: logId={}, messageId={}, groupId={}",
+                logId, messageLog.getMessageId(), groupId);
+
+            // Set status to pending before retry
+            messageLog.setSendStatus(MessageLog.SendStatus.PENDING);
+            messageLog.setErrorMessage(null);
+            messageLogMapper.updateById(messageLog);
+
+            // Retry sending via NapCat API
+            ApiCallResponseDTO response = napCatAdapter.sendGroupMessage(groupId, replyContent)
+                .get(10, TimeUnit.SECONDS);
+
+            if (response != null && response.getRetcode() == 0) {
+                // Success
+                messageLog.setSendStatus(MessageLog.SendStatus.SUCCESS);
+                messageLog.setErrorMessage(null);
+                log.info("Retry message succeeded: logId={}, messageId={}", logId, messageLog.getMessageId());
+            } else {
+                // Failed again
+                messageLog.setSendStatus(MessageLog.SendStatus.FAILED);
+                String errorMsg = String.format("重试失败: retcode=%d, message=%s",
+                    response != null ? response.getRetcode() : -1,
+                    response != null ? response.getMessage() : "null response");
+                messageLog.setErrorMessage(errorMsg);
+                log.warn("Retry message failed: logId={}, messageId={}, error={}",
+                    logId, messageLog.getMessageId(), errorMsg);
+            }
+
+            messageLogMapper.updateById(messageLog);
+
+        } catch (Exception e) {
+            messageLog.setSendStatus(MessageLog.SendStatus.FAILED);
+            messageLog.setErrorMessage("重试异常: " + e.getMessage());
+            messageLogMapper.updateById(messageLog);
+            log.error("Retry failed message error: logId={}, messageId={}",
+                logId, messageLog.getMessageId(), e);
+        }
     }
 }
