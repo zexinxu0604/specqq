@@ -431,6 +431,181 @@ npm run preview
 
 ---
 
+## 🌐 API Examples (curl)
+
+### Parse CQ Codes
+
+```bash
+curl -X POST http://localhost:8080/api/cqcode/parse \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Hello[CQ:face,id=123]世界[CQ:image,file=abc.jpg]"
+  }'
+
+# Response:
+# {
+#   "code": 200,
+#   "message": "Success",
+#   "data": [
+#     {
+#       "type": "face",
+#       "params": {"id": "123"},
+#       "rawText": "[CQ:face,id=123]",
+#       "label": "表情",
+#       "unit": "个"
+#     },
+#     {
+#       "type": "image",
+#       "params": {"file": "abc.jpg"},
+#       "rawText": "[CQ:image,file=abc.jpg]",
+#       "label": "图片",
+#       "unit": "张"
+#     }
+#   ]
+# }
+```
+
+### Strip CQ Codes
+
+```bash
+curl -X POST http://localhost:8080/api/cqcode/strip \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Hello[CQ:face,id=123]世界"
+  }'
+
+# Response:
+# {
+#   "code": 200,
+#   "data": {
+#     "plainText": "Hello世界",
+#     "characterCount": 7
+#   }
+# }
+```
+
+### Get CQ Code Types
+
+```bash
+curl http://localhost:8080/api/cqcode/types
+
+# Response:
+# {
+#   "code": 200,
+#   "data": [
+#     {"code": "face", "label": "表情", "unit": "个"},
+#     {"code": "image", "label": "图片", "unit": "张"},
+#     {"code": "at", "label": "@提及", "unit": "个"},
+#     {"code": "reply", "label": "回复", "unit": "条"},
+#     {"code": "record", "label": "语音", "unit": "条"},
+#     {"code": "video", "label": "视频", "unit": "个"}
+#   ]
+# }
+```
+
+### Get Predefined Patterns
+
+```bash
+curl http://localhost:8080/api/cqcode/patterns
+
+# Response:
+# {
+#   "code": 200,
+#   "data": [
+#     {
+#       "type": "face",
+#       "label": "表情",
+#       "regexPattern": "\\[CQ:face(?:,[^\\]]+)?\\]"
+#     },
+#     {
+#       "type": "image",
+#       "label": "图片",
+#       "regexPattern": "\\[CQ:image(?:,[^\\]]+)?\\]"
+#     }
+#   ]
+# }
+```
+
+### Validate CQ Code Pattern
+
+```bash
+curl -X POST http://localhost:8080/api/cqcode/patterns/validate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "cqCode": "\\[CQ:image,file=.*\\.jpg\\]"
+  }'
+
+# Response:
+# {
+#   "code": 200,
+#   "data": {
+#     "valid": true
+#   }
+# }
+```
+
+### Calculate Message Statistics
+
+```bash
+curl -X POST http://localhost:8080/api/statistics/calculate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "你好世界[CQ:face,id=123][CQ:image,file=abc.jpg]"
+  }'
+
+# Response:
+# {
+#   "code": 200,
+#   "data": {
+#     "characterCount": 4,
+#     "cqCodeCounts": {
+#       "face": 1,
+#       "image": 1
+#     }
+#   }
+# }
+```
+
+### Format Statistics Reply
+
+```bash
+curl -X POST http://localhost:8080/api/statistics/format \
+  -H "Content-Type: application/json" \
+  -d '{
+    "characterCount": 4,
+    "cqCodeCounts": {
+      "face": 1,
+      "image": 1
+    }
+  }'
+
+# Response:
+# {
+#   "code": 200,
+#   "data": "文字: 4字, 表情: 1个, 图片: 1张"
+# }
+```
+
+### Health Check (NapCat Connection)
+
+```bash
+curl http://localhost:8080/actuator/health/napCatHealthIndicator
+
+# Response (healthy):
+# {
+#   "status": "UP",
+#   "details": {
+#     "status": "NapCat connection healthy",
+#     "totalCalls": 150,
+#     "successRate": "95.33%",
+#     "failureRate": "4.67%",
+#     "failedCalls": 7
+#   }
+# }
+```
+
+---
+
 ## 📝 Next Steps
 
 1. **Read Documentation**: Start with [spec.md](./spec.md) to understand requirements

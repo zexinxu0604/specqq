@@ -268,8 +268,8 @@ Before proceeding to implementation tasks (T026-T056), you MUST:
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T111 [P] Update API documentation in `specs/002-napcat-cqcode-parser/contracts/` (add examples, clarify response formats)
-- [ ] T112 [P] Update developer quickstart in `specs/002-napcat-cqcode-parser/quickstart.md` (add setup instructions, API examples)
+- [x] T111 [P] Update API documentation in `specs/002-napcat-cqcode-parser/contracts/` (add examples, clarify response formats)
+- [x] T112 [P] Update developer quickstart in `specs/002-napcat-cqcode-parser/quickstart.md` (add setup instructions, API examples)
 - [ ] T113 [P] Add SonarQube analysis for new code in `pom.xml` (ensure ≥80% coverage, no Critical issues)
 - [x] T114 Code cleanup: Remove dead code, optimize imports, format code per Alibaba style guide
 - [ ] T115 Performance optimization: Profile CQ code parsing, optimize regex cache hit rate to ≥95%
