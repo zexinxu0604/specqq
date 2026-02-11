@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.specqq.chatbot.mapper.MessageRuleMapper">
+
+    <!-- Select: selectEnabledRulesByGroupId -->
+    <select id="selectEnabledRulesByGroupId" resultType="com.specqq.chatbot.entity.MessageRule">
+        SELECT
+            r.id,
+            r.name,
+            r.description,
+            r.match_type,
+            r.pattern,
+            r.response_template,
+            r.priority,
+            r.enabled,
+            r.created_by,
+            r.created_at,
+            r.updated_at
+        FROM message_rule r
+        INNER JOIN group_rule_config grc ON r.id = grc.rule_id
+        WHERE grc.group_id = #{groupId}
+          AND r.enabled = TRUE
+          AND grc.enabled = TRUE
+        ORDER BY r.priority DESC, r.created_at ASC
+    </select>
+
+</mapper>

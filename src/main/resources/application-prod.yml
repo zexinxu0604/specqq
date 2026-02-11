@@ -1,0 +1,109 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://mysql:3306/chatbot_router?useUnicode=true&characterEncoding=utf8&useSSL=true&serverTimezone=Asia/Shanghai}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 5000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: ChatbotHikariCP
+
+  data:
+    redis:
+      host: ${REDIS_HOST:redis}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+          max-wait: 2000ms
+
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+    serialization:
+      write-dates-as-timestamps: false
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+    lazy-loading-enabled: false
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.specqq.chatbot.entity
+
+# Caffeine缓存配置
+caffeine:
+  rules:
+    maximum-size: 10000
+    expire-after-write: 1h
+  compiled-regex:
+    maximum-size: 1000
+    expire-after-write: 2h
+
+# NapCat连接配置
+# 注意: 默认使用host.docker.internal访问宿主机上的NapCat
+# 如果NapCat在Docker容器中，请修改为: http://napcat:5700 和 ws://napcat:6700/
+napcat:
+  http:
+    url: ${NAPCAT_HTTP_URL:http://host.docker.internal:3000}
+    access-token: ${NAPCAT_HTTP_TOKEN}
+    connection-pool:
+      max-total: 50
+      max-per-route: 20
+      connect-timeout: 5s
+      socket-timeout: 5s
+  websocket:
+    url: ${NAPCAT_WS_URL:ws://host.docker.internal:3001}
+    access-token: ${NAPCAT_WS_TOKEN}
+    heartbeat-interval: 15s
+    reconnect:
+      enabled: true
+      max-attempts: 3
+      backoff-intervals: 1s,2s,4s,8s,16s,60s
+
+# 规则引擎配置
+rule-engine:
+  rate-limit:
+    max-requests-per-window: 3
+    window-seconds: 5
+  batch-logging:
+    batch-size: 100
+    flush-interval-ms: 1000
+
+# JWT配置
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: 86400000  # 24 hours
+
+# SpringDoc OpenAPI配置
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.specqq.chatbot: INFO
+    com.baomidou.mybatisplus: WARN
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+  file:
+    name: /var/log/chatbot-router/application.log
+    max-size: 100MB
+    max-history: 30

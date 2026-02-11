@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.specqq.chatbot.mapper.MessageLogMapper">
+
+    <!-- Select: selectByConditions -->
+    <select id="selectByConditions" resultType="com.specqq.chatbot.entity.MessageLog">
+        SELECT
+            ml.id,
+            ml.message_id,
+            ml.group_id,
+            ml.user_id,
+            ml.user_nickname,
+            ml.message_content,
+            ml.matched_rule_id,
+            ml.response_content,
+            ml.processing_time_ms,
+            ml.send_status,
+            ml.error_message,
+            ml.timestamp
+        FROM message_log ml
+        WHERE 1=1
+        <if test="groupId != null">
+            AND ml.group_id = #{groupId}
+        </if>
+        <if test="userId != null and userId != ''">
+            AND ml.user_id = #{userId}
+        </if>
+        <if test="startTime != null">
+            AND ml.timestamp &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND ml.timestamp &lt;= #{endTime}
+        </if>
+        ORDER BY ml.timestamp DESC
+    </select>
+
+</mapper>

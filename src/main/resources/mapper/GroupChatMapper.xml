@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.specqq.chatbot.mapper.GroupChatMapper">
+
+    <!-- Result Map: GroupChat with enabledRules -->
+    <resultMap id="GroupChatWithRulesMap" type="com.specqq.chatbot.entity.GroupChat">
+        <id column="id" property="id"/>
+        <result column="group_id" property="groupId"/>
+        <result column="group_name" property="groupName"/>
+        <result column="client_id" property="clientId"/>
+        <result column="member_count" property="memberCount"/>
+        <result column="enabled" property="enabled"/>
+        <result column="config" property="config" typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+
+        <!-- Collection: enabledRules -->
+        <collection property="enabledRules" ofType="com.specqq.chatbot.entity.MessageRule">
+            <id column="rule_id" property="id"/>
+            <result column="rule_name" property="name"/>
+            <result column="rule_description" property="description"/>
+            <result column="rule_match_type" property="matchType"/>
+            <result column="rule_pattern" property="pattern"/>
+            <result column="rule_response_template" property="responseTemplate"/>
+            <result column="rule_priority" property="priority"/>
+            <result column="rule_enabled" property="enabled"/>
+            <result column="rule_created_by" property="createdBy"/>
+            <result column="rule_created_at" property="createdAt"/>
+            <result column="rule_updated_at" property="updatedAt"/>
+        </collection>
+    </resultMap>
+
+    <!-- Select: selectWithRules -->
+    <select id="selectWithRules" resultMap="GroupChatWithRulesMap">
+        SELECT
+            g.id,
+            g.group_id,
+            g.group_name,
+            g.client_id,
+            g.member_count,
+            g.enabled,
+            g.config,
+            g.created_at,
+            g.updated_at,
+            r.id AS rule_id,
+            r.name AS rule_name,
+            r.description AS rule_description,
+            r.match_type AS rule_match_type,
+            r.pattern AS rule_pattern,
+            r.response_template AS rule_response_template,
+            r.priority AS rule_priority,
+            r.enabled AS rule_enabled,
+            r.created_by AS rule_created_by,
+            r.created_at AS rule_created_at,
+            r.updated_at AS rule_updated_at
+        FROM group_chat g
+        LEFT JOIN group_rule_config grc ON g.id = grc.group_id AND grc.enabled = TRUE
+        LEFT JOIN message_rule r ON grc.rule_id = r.id AND r.enabled = TRUE
+        WHERE g.client_id = #{clientId}
+        <if test="enabled != null">
+            AND g.enabled = #{enabled}
+        </if>
+        ORDER BY g.id, r.priority DESC, r.created_at ASC
+    </select>
+
+</mapper>

@@ -1,0 +1,106 @@
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/chatbot_router?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 5000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+      pool-name: ChatbotHikariCP
+
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 3000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+          max-wait: 2000ms
+
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
+    serialization:
+      write-dates-as-timestamps: false
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    map-underscore-to-camel-case: true
+    cache-enabled: true
+    lazy-loading-enabled: false
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.specqq.chatbot.entity
+
+# Caffeine缓存配置
+caffeine:
+  rules:
+    maximum-size: 10000
+    expire-after-write: 1h
+  compiled-regex:
+    maximum-size: 1000
+    expire-after-write: 2h
+
+# NapCat连接配置
+napcat:
+  http:
+    url: ${NAPCAT_HTTP_URL:http://127.0.0.1:3000}
+    access-token: ${NAPCAT_HTTP_TOKEN:pDcIldXJcsTlEYxy}
+    connection-pool:
+      max-total: 50
+      max-per-route: 20
+      connect-timeout: 5s
+      socket-timeout: 5s
+  websocket:
+    url: ${NAPCAT_WS_URL:ws://127.0.0.1:3001}
+    access-token: ${NAPCAT_WS_TOKEN:abc1234}
+    heartbeat-interval: 15s
+    reconnect:
+      enabled: true
+      max-attempts: 3
+      backoff-intervals: 1s,2s,4s,8s,16s,60s
+
+# 规则引擎配置
+rule-engine:
+  rate-limit:
+    max-requests-per-window: 3
+    window-seconds: 5
+  batch-logging:
+    batch-size: 100
+    flush-interval-ms: 1000
+
+# JWT配置
+jwt:
+  secret: ${JWT_SECRET:your-secret-key-min-32-characters-for-hs256}
+  expiration: 86400000  # 24 hours in milliseconds
+
+# SpringDoc OpenAPI配置
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
+
+logging:
+  level:
+    com.specqq.chatbot: DEBUG
+    com.baomidou.mybatisplus: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.security: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
