@@ -84,3 +84,20 @@ logs/
 .idea/workspace.xml
 .idea/usage.statistics.xml
 .idea/shelf/
+
+### Documentation ###
+# Feature documentation and reports
+FEATURE_*.md
+NAPCAT_*.md
+*_COMPLETION_*.md
+*_TODOS_*.md
+*_OPTIMIZATION_*.md
+
+# Specs and planning documents
+specs/
+
+# Documentation directory
+docs/
+
+# Test results
+test-results/
