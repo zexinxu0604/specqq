@@ -58,11 +58,11 @@ public class CQCodeParser {
      * @param totalCountGauge Gauge for total CQ codes parsed
      */
     public CQCodeParser(@Qualifier(CQCodeConstants.CACHE_CQ_PATTERNS) Cache<String, Pattern> patternCache,
-                        Counter parseCounter,
-                        Timer parseDurationTimer,
-                        Counter cacheHitsCounter,
-                        Counter cacheMissesCounter,
-                        AtomicInteger totalCountGauge) {
+                        @Qualifier("cqCodeParseCounter") Counter parseCounter,
+                        @Qualifier("cqCodeParseDurationTimer") Timer parseDurationTimer,
+                        @Qualifier("cqCodeCacheHitsCounter") Counter cacheHitsCounter,
+                        @Qualifier("cqCodeCacheMissesCounter") Counter cacheMissesCounter,
+                        @Qualifier("cqCodeTotalCount") AtomicInteger totalCountGauge) {
         this.patternCache = patternCache;
         this.cqCodePattern = Pattern.compile(CQCodeConstants.CQ_CODE_PATTERN);
         this.parseCounter = parseCounter;
