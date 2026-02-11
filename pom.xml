@@ -34,6 +34,18 @@
         <springdoc.version>2.3.0</springdoc.version>
         <testcontainers.version>1.19.3</testcontainers.version>
         <httpclient5.version>5.3</httpclient5.version>
+
+        <!-- T113: SonarQube Configuration -->
+        <sonar.projectKey>specqq-chatbot-router</sonar.projectKey>
+        <sonar.projectName>SpecQQ Chatbot Router</sonar.projectName>
+        <sonar.host.url>http://localhost:9000</sonar.host.url>
+        <sonar.java.coveragePlugin>jacoco</sonar.java.coveragePlugin>
+        <sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.exclusions>**/entity/**,**/dto/**,**/vo/**,**/config/**,**/ChatbotApplication.java</sonar.exclusions>
+        <sonar.coverage.exclusions>**/entity/**,**/dto/**,**/vo/**,**/config/**,**/ChatbotApplication.java</sonar.coverage.exclusions>
+        <!-- Quality Gate Thresholds (per constitution) -->
+        <sonar.qualitygate.wait>true</sonar.qualitygate.wait>
+        <sonar.coverage.minimum>80</sonar.coverage.minimum>
     </properties>
 
     <dependencies>
@@ -284,7 +296,57 @@
                             <goal>report</goal>
                         </goals>
                     </execution>
+                    <!-- T113: Generate XML report for SonarQube -->
+                    <execution>
+                        <id>jacoco-report-xml</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <dataFile>${project.build.directory}/jacoco.exec</dataFile>
+                            <outputDirectory>${project.build.directory}/site/jacoco</outputDirectory>
+                        </configuration>
+                    </execution>
+                    <!-- T113: Enforce coverage thresholds -->
+                    <execution>
+                        <id>jacoco-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <rule>
+                                    <element>BUNDLE</element>
+                                    <limits>
+                                        <limit>
+                                            <counter>LINE</counter>
+                                            <value>COVEREDRATIO</value>
+                                            <minimum>0.80</minimum>
+                                        </limit>
+                                    </limits>
+                                </rule>
+                            </rules>
+                        </configuration>
+                    </execution>
                 </executions>
+                <configuration>
+                    <excludes>
+                        <exclude>**/entity/**</exclude>
+                        <exclude>**/dto/**</exclude>
+                        <exclude>**/vo/**</exclude>
+                        <exclude>**/config/**</exclude>
+                        <exclude>**/ChatbotApplication.class</exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+
+            <!-- T113: SonarQube Maven Plugin -->
+            <plugin>
+                <groupId>org.sonarsource.scanner.maven</groupId>
+                <artifactId>sonar-maven-plugin</artifactId>
+                <version>3.10.0.2594</version>
             </plugin>
         </plugins>
     </build>
