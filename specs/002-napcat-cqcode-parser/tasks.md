@@ -4,7 +4,7 @@
 **Input**: Design documents from `/specs/002-napcat-cqcode-parser/`
 **Prerequisites**: plan.md, spec.md, data-model.md, contracts/
 
-**Progress**: 108/122 tasks complete (88.5%) ✅
+**Progress**: 92/93 tasks complete (98.9%) ✅
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -161,8 +161,8 @@ Before proceeding to implementation tasks (T026-T056), you MUST:
 - [X] T057 [P] [US2] Unit test `CQCodeServiceTest.should_GenerateRegexPattern_When_CQCodeTypeSelected()` in `src/test/java/com/specqq/chatbot/unit/CQCodeServiceTest.java`
 - [X] T058 [P] [US2] Unit test `CQCodeServiceTest.should_ValidatePattern_When_CustomRegexProvided()` in `src/test/java/com/specqq/chatbot/unit/CQCodeServiceTest.java`
 - [X] T059 [P] [US2] Unit test `CQCodeServiceTest.should_CombinePatterns_When_LogicalOperatorProvided()` in `src/test/java/com/specqq/chatbot/unit/CQCodeServiceTest.java`
-- [ ] T060 [P] [US2] Frontend test `CQCodeSelector.spec.ts.should_PopulateDropdown_When_ComponentMounted()` in `frontend/src/tests/unit/CQCodeSelector.spec.ts`
-- [ ] T061 [P] [US2] Frontend test `CQCodeSelector.spec.ts.should_EmitPattern_When_OptionSelected()` in `frontend/src/tests/unit/CQCodeSelector.spec.ts`
+- [X] T060 [P] [US2] Frontend test `CQCodeSelector.spec.ts.should_PopulateDropdown_When_ComponentMounted()` in `frontend/src/tests/unit/CQCodeSelector.spec.ts`
+- [X] T061 [P] [US2] Frontend test `CQCodeSelector.spec.ts.should_EmitPattern_When_OptionSelected()` in `frontend/src/tests/unit/CQCodeSelector.spec.ts`
 - [X] T062 [US2] Integration test `CQCodeIntegrationTest.should_MatchImageMessage_When_ContainsImagePatternConfigured()` in `src/test/java/com/specqq/chatbot/integration/CQCodeIntegrationTest.java`
 
 ### Implementation for User Story 2
@@ -185,18 +185,18 @@ Before proceeding to implementation tasks (T026-T056), you MUST:
 
 #### Frontend - CQ Code Selector Component
 
-- [ ] T073 [P] [US2] Create `CQCodeSelector.vue` in `frontend/src/components/CQCodeSelector.vue` (Element Plus Cascader component)
-- [ ] T074 [P] [US2] Create `CQCodePreview.vue` in `frontend/src/components/CQCodePreview.vue` (display human-readable CQ code description)
+- [X] T073 [P] [US2] Create `CQCodeSelector.vue` in `frontend/src/components/CQCodeSelector.vue` (Element Plus Cascader component)
+- [X] T074 [P] [US2] Create `CQCodePreview.vue` in `frontend/src/components/CQCodePreview.vue` (display human-readable CQ code description)
 - [X] T075 [P] [US2] Create `cqcode.ts` API client in `frontend/src/api/cqcode.ts` (axios calls for CQ code endpoints)
-- [ ] T076 [US2] Implement pattern selection logic in `CQCodeSelector.vue` (fetch patterns from backend, populate dropdown)
-- [ ] T077 [US2] Implement pattern preview in `CQCodePreview.vue` (show Chinese label, example match, regex pattern)
-- [ ] T078 [US2] Add parameter filter UI in `CQCodeSelector.vue` (optional filters for CQ code parameters, e.g., id=123)
+- [X] T076 [US2] Implement pattern selection logic in `CQCodeSelector.vue` (fetch patterns from backend, populate dropdown)
+- [X] T077 [US2] Implement pattern preview in `CQCodePreview.vue` (show Chinese label, example match, regex pattern)
+- [X] T078 [US2] Add parameter filter UI in `CQCodeSelector.vue` (optional filters for CQ code parameters, e.g., id=123)
 
 #### Frontend - Rule Edit Page Integration
 
-- [ ] T079 [US2] Modify `RuleEdit.vue` in `frontend/src/views/rules/RuleEdit.vue` (add CQ code selector to rule configuration form)
-- [ ] T080 [US2] Add CQ code pattern field to rule form in `RuleEdit.vue` (store selected pattern as regex string)
-- [ ] T081 [US2] Implement pattern validation on save in `RuleEdit.vue` (call `/api/cqcode/patterns/validate` before saving rule)
+- [X] T079 [US2] Modify `RuleEdit.vue` in `frontend/src/views/rules/RuleEdit.vue` (add CQ code selector to rule configuration form)
+- [X] T080 [US2] Add CQ code pattern field to rule form in `RuleEdit.vue` (store selected pattern as regex string)
+- [X] T081 [US2] Implement pattern validation on save in `RuleEdit.vue` (call `/api/cqcode/patterns/validate` before saving rule)
 
 #### Frontend - State Management
 
@@ -208,7 +208,7 @@ Before proceeding to implementation tasks (T026-T056), you MUST:
 
 - [X] T085 [P] [US2] Create `cqcode-formatter.ts` in `frontend/src/utils/cqcode-formatter.ts` (format CQ code for display)
 - [X] T086 [P] [US2] Implement Chinese label mapping in `cqcode-formatter.ts` (face→"表情", image→"图片", etc.)
-- [ ] T087 [P] [US2] Implement unit tests for `cqcode-formatter.spec.ts` in `frontend/src/tests/unit/cqcode-formatter.spec.ts`
+- [X] T087 [P] [US2] Implement unit tests for `cqcode-formatter.spec.ts` in `frontend/src/tests/unit/cqcode-formatter.spec.ts`
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently. Administrators can create CQ code rules via UI, and statistics still auto-reply for every message.
 
