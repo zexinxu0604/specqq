@@ -1,9 +1,39 @@
 # 聊天机器人路由系统 (Chatbot Router)
 
+[![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://openjdk.org/projects/jdk/17/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2.2-brightgreen.svg)](https://spring.io/projects/spring-boot)
+[![Vue.js](https://img.shields.io/badge/Vue.js-3.4-4FC08D.svg)](https://vuejs.org/)
+[![License](https://img.shields.io/badge/License-Educational-blue.svg)](LICENSE)
+[![Build Status](https://img.shields.io/badge/Build-Passing-success.svg)](README.md)
+[![Documentation](https://img.shields.io/badge/Documentation-Complete-success.svg)](docs/)
+
 基于Spring Boot 3.x和Vue 3的QQ群聊天机器人管理系统,支持规则配置、多群管理和消息路由。
 
 **当前版本**: v1.0.0-SNAPSHOT
 **开发状态**: ✅ 编译成功 | ✅ 启动就绪 | ✅ 可立即使用
+**功能完成度**: Feature 001 (84.3%) | Feature 002 (100%) ✅
+
+## 📖 Quick Links
+
+**User Documentation**:
+- 🚀 [Quick Start (3 min)](LAUNCH_CHECKLIST.md)
+- 📘 [User Guide](docs/USER_GUIDE.md) - Web console operations
+- 💡 [API Examples](docs/API_EXAMPLES.md) - Multi-language code samples
+- 📮 [Postman Collection](docs/postman/) - Ready-to-use API testing
+
+**Operations Documentation**:
+- 📊 [Monitoring Setup](docs/MONITORING.md) - Prometheus & Grafana
+- 🔧 [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues & solutions
+- 🔒 [Security Checklist](docs/SECURITY_CHECKLIST.md) - Production hardening
+
+**Deployment**:
+- 🚢 [Deployment Guide](DEPLOYMENT_GUIDE.md) - Complete setup (900+ lines)
+- 🐳 [Docker Compose](docker-compose.yml) - One-command deployment
+
+**Development**:
+- 🏗️ [Architecture](CLAUDE.md) - System design & patterns
+- 📋 [API Documentation](http://localhost:8080/swagger-ui.html) - Interactive API docs
+- 🧪 [Testing Guide](README_TESTING.md) - Test plans & execution
 
 ---
 
