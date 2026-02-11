@@ -56,6 +56,13 @@ public class NapCatAdapter implements ClientAdapter {
     // Request-response correlation map for API calls
     private final Map<String, CompletableFuture<ApiCallResponseDTO>> pendingRequests = new ConcurrentHashMap<>();
 
+    // T104: Metrics for API call performance
+    private final java.util.concurrent.atomic.AtomicLong totalApiCalls = new java.util.concurrent.atomic.AtomicLong(0);
+    private final java.util.concurrent.atomic.AtomicLong successfulApiCalls = new java.util.concurrent.atomic.AtomicLong(0);
+    private final java.util.concurrent.atomic.AtomicLong failedApiCalls = new java.util.concurrent.atomic.AtomicLong(0);
+    private final java.util.concurrent.atomic.AtomicLong timeoutApiCalls = new java.util.concurrent.atomic.AtomicLong(0);
+    private final java.util.concurrent.atomic.AtomicLong totalExecutionTime = new java.util.concurrent.atomic.AtomicLong(0);
+
     @PostConstruct
     public void init() {
         // 创建HTTP异步客户端(连接池配置)
@@ -248,6 +255,13 @@ public class NapCatAdapter implements ClientAdapter {
         long startTime = System.currentTimeMillis();
         String requestId = UUID.randomUUID().toString();
 
+        // T104: Increment total API calls counter
+        totalApiCalls.incrementAndGet();
+
+        // T105: Structured logging - API call initiated
+        log.info("NapCat API call initiated: requestId={}, action={}, params={}",
+                requestId, action, params);
+
         CompletableFuture<ApiCallResponseDTO> future = new CompletableFuture<>();
         pendingRequests.put(requestId, future);
 
@@ -275,35 +289,68 @@ public class NapCatAdapter implements ClientAdapter {
                     try {
                         long executionTime = System.currentTimeMillis() - startTime;
                         String responseBody = response.getBodyText();
+                        int statusCode = response.getCode();
 
                         // Parse response
                         ApiCallResponseDTO apiResponse = parseApiResponse(responseBody, requestId, executionTime);
+
+                        // T104: Record metrics for successful API call
+                        successfulApiCalls.incrementAndGet();
+                        totalExecutionTime.addAndGet(executionTime);
+
+                        // T105: Structured logging - API call completed
+                        log.info("NapCat API call completed: requestId={}, action={}, status={}, retcode={}, executionTime={}ms, httpStatus={}, successRate={}%",
+                                requestId, action, apiResponse.getStatus(), apiResponse.getRetcode(), executionTime, statusCode,
+                                getSuccessRate());
 
                         CompletableFuture<ApiCallResponseDTO> pending = pendingRequests.remove(requestId);
                         if (pending != null) {
                             pending.complete(apiResponse);
                         }
                     } catch (Exception e) {
-                        log.error("Failed to parse API response: action={}", action, e);
+                        long executionTime = System.currentTimeMillis() - startTime;
+                        // T103: Enhanced error handling with meaningful error message
+                        String errorMessage = String.format("Failed to parse NapCat API response for action '%s': %s",
+                                action, e.getMessage());
+                        log.error("NapCat API parse error: requestId={}, action={}, executionTime={}ms, error={}",
+                                requestId, action, executionTime, errorMessage, e);
+
                         CompletableFuture<ApiCallResponseDTO> pending = pendingRequests.remove(requestId);
                         if (pending != null) {
-                            pending.completeExceptionally(e);
+                            pending.completeExceptionally(new RuntimeException(errorMessage, e));
                         }
                     }
                 }
 
                 @Override
                 public void failed(Exception ex) {
-                    log.error("API call failed: action={}", action, ex);
+                    long executionTime = System.currentTimeMillis() - startTime;
+
+                    // T104: Record metrics for failed API call
+                    failedApiCalls.incrementAndGet();
+                    totalExecutionTime.addAndGet(executionTime);
+
+                    // T103: Enhanced error handling with meaningful error message
+                    String errorMessage = String.format("NapCat API call failed for action '%s': %s. " +
+                            "Please check NapCat server connectivity and configuration.",
+                            action, ex.getMessage());
+                    log.error("NapCat API call failed: requestId={}, action={}, executionTime={}ms, error={}, successRate={}%",
+                            requestId, action, executionTime, errorMessage, getSuccessRate(), ex);
+
                     CompletableFuture<ApiCallResponseDTO> pending = pendingRequests.remove(requestId);
                     if (pending != null) {
-                        pending.completeExceptionally(ex);
+                        pending.completeExceptionally(new RuntimeException(errorMessage, ex));
                     }
                 }
 
                 @Override
                 public void cancelled() {
-                    log.warn("API call cancelled: action={}", action);
+                    long executionTime = System.currentTimeMillis() - startTime;
+                    // T103: Enhanced error handling with meaningful error message
+                    String errorMessage = String.format("NapCat API call cancelled for action '%s'", action);
+                    log.warn("NapCat API call cancelled: requestId={}, action={}, executionTime={}ms",
+                            requestId, action, executionTime);
+
                     CompletableFuture<ApiCallResponseDTO> pending = pendingRequests.remove(requestId);
                     if (pending != null) {
                         pending.cancel(true);
@@ -314,17 +361,35 @@ public class NapCatAdapter implements ClientAdapter {
             // Set timeout
             future.orTimeout(httpTimeout, TimeUnit.MILLISECONDS)
                     .exceptionally(throwable -> {
+                        long executionTime = System.currentTimeMillis() - startTime;
                         pendingRequests.remove(requestId);
+
                         if (throwable instanceof java.util.concurrent.TimeoutException) {
-                            log.error("API call timeout: action={}, timeout={}ms", action, httpTimeout);
+                            // T104: Record metrics for timeout
+                            timeoutApiCalls.incrementAndGet();
+                            failedApiCalls.incrementAndGet();
+                            totalExecutionTime.addAndGet(executionTime);
+
+                            // T103: Enhanced error handling with meaningful error message
+                            String errorMessage = String.format("NapCat API call timeout for action '%s' after %dms. " +
+                                    "Consider increasing napcat.http.timeout or checking server performance.",
+                                    action, httpTimeout);
+                            log.error("NapCat API timeout: requestId={}, action={}, timeout={}ms, executionTime={}ms, timeoutRate={}%",
+                                    requestId, action, httpTimeout, executionTime, getTimeoutRate());
                         }
                         return null;
                     });
 
         } catch (Exception e) {
-            log.error("Failed to send API request: action={}", action, e);
+            long executionTime = System.currentTimeMillis() - startTime;
+            // T103: Enhanced error handling with meaningful error message
+            String errorMessage = String.format("Failed to send NapCat API request for action '%s': %s",
+                    action, e.getMessage());
+            log.error("NapCat API request error: requestId={}, action={}, executionTime={}ms, error={}",
+                    requestId, action, executionTime, errorMessage, e);
+
             pendingRequests.remove(requestId);
-            future.completeExceptionally(e);
+            future.completeExceptionally(new RuntimeException(errorMessage, e));
         }
 
         return future;
@@ -416,5 +481,58 @@ public class NapCatAdapter implements ClientAdapter {
         params.put("group_id", groupId);
         params.put("messages", messages);
         return callApiWithFallback("send_forward_msg", params);
+    }
+
+    /**
+     * T104: Get API call metrics
+     *
+     * @return Map containing performance metrics
+     */
+    public Map<String, Object> getApiMetrics() {
+        long total = totalApiCalls.get();
+        long successful = successfulApiCalls.get();
+        long failed = failedApiCalls.get();
+        long timeout = timeoutApiCalls.get();
+        long totalTime = totalExecutionTime.get();
+
+        Map<String, Object> metrics = new HashMap<>();
+        metrics.put("totalCalls", total);
+        metrics.put("successfulCalls", successful);
+        metrics.put("failedCalls", failed);
+        metrics.put("timeoutCalls", timeout);
+        metrics.put("successRate", getSuccessRate());
+        metrics.put("failureRate", getFailureRate());
+        metrics.put("timeoutRate", getTimeoutRate());
+        metrics.put("averageExecutionTime", total > 0 ? totalTime / total : 0);
+        metrics.put("totalExecutionTime", totalTime);
+
+        return metrics;
+    }
+
+    /**
+     * T104: Calculate success rate
+     */
+    private double getSuccessRate() {
+        long total = totalApiCalls.get();
+        if (total == 0) return 0.0;
+        return (successfulApiCalls.get() * 100.0) / total;
+    }
+
+    /**
+     * T104: Calculate failure rate
+     */
+    private double getFailureRate() {
+        long total = totalApiCalls.get();
+        if (total == 0) return 0.0;
+        return (failedApiCalls.get() * 100.0) / total;
+    }
+
+    /**
+     * T104: Calculate timeout rate
+     */
+    private double getTimeoutRate() {
+        long total = totalApiCalls.get();
+        if (total == 0) return 0.0;
+        return (timeoutApiCalls.get() * 100.0) / total;
     }
 }

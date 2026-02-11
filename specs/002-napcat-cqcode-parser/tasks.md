@@ -248,9 +248,9 @@ Before proceeding to implementation tasks (T026-T056), you MUST:
 
 #### Error Handling and Monitoring
 
-- [ ] T103 [US3] Add error handling for API call failures in `NapCatAdapter.java` (log error, return meaningful error message)
-- [ ] T104 [US3] Add metrics for API call performance in `NapCatAdapter.java` (execution time, success rate, fallback rate)
-- [ ] T105 [US3] Add structured logging for API calls in `NapCatAdapter.java` (log action, params, status, execution time)
+- [x] T103 [US3] Add error handling for API call failures in `NapCatAdapter.java` (log error, return meaningful error message)
+- [x] T104 [US3] Add metrics for API call performance in `NapCatAdapter.java` (execution time, success rate, fallback rate)
+- [x] T105 [US3] Add structured logging for API calls in `NapCatAdapter.java` (log action, params, status, execution time)
 
 #### Additional NapCat API Methods
 
