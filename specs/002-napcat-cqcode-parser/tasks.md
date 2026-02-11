@@ -4,7 +4,7 @@
 **Input**: Design documents from `/specs/002-napcat-cqcode-parser/`
 **Prerequisites**: plan.md, spec.md, data-model.md, contracts/
 
-**Progress**: 103/122 tasks complete (84.4%) ✅
+**Progress**: 108/122 tasks complete (88.5%) ✅
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
 
@@ -187,7 +187,7 @@ Before proceeding to implementation tasks (T026-T056), you MUST:
 
 - [ ] T073 [P] [US2] Create `CQCodeSelector.vue` in `frontend/src/components/CQCodeSelector.vue` (Element Plus Cascader component)
 - [ ] T074 [P] [US2] Create `CQCodePreview.vue` in `frontend/src/components/CQCodePreview.vue` (display human-readable CQ code description)
-- [ ] T075 [P] [US2] Create `cqcode.ts` API client in `frontend/src/api/cqcode.ts` (axios calls for CQ code endpoints)
+- [X] T075 [P] [US2] Create `cqcode.ts` API client in `frontend/src/api/cqcode.ts` (axios calls for CQ code endpoints)
 - [ ] T076 [US2] Implement pattern selection logic in `CQCodeSelector.vue` (fetch patterns from backend, populate dropdown)
 - [ ] T077 [US2] Implement pattern preview in `CQCodePreview.vue` (show Chinese label, example match, regex pattern)
 - [ ] T078 [US2] Add parameter filter UI in `CQCodeSelector.vue` (optional filters for CQ code parameters, e.g., id=123)
@@ -200,14 +200,14 @@ Before proceeding to implementation tasks (T026-T056), you MUST:
 
 #### Frontend - State Management
 
-- [ ] T082 [P] [US2] Create `cqcode.ts` Pinia store in `frontend/src/stores/cqcode.ts` (manage CQ code patterns state)
-- [ ] T083 [P] [US2] Create TypeScript types in `frontend/src/types/cqcode.ts` (CQCodePattern, CQCodeType, ParamFilter interfaces)
-- [ ] T084 [US2] Implement pattern caching in `cqcode.ts` store (cache predefined patterns, refresh on demand)
+- [X] T082 [P] [US2] Create `cqcode.ts` Pinia store in `frontend/src/stores/cqcode.ts` (manage CQ code patterns state)
+- [X] T083 [P] [US2] Create TypeScript types in `frontend/src/types/cqcode.ts` (CQCodePattern, CQCodeType, ParamFilter interfaces)
+- [X] T084 [US2] Implement pattern caching in `cqcode.ts` store (cache predefined patterns, refresh on demand)
 
 #### Frontend - Utilities
 
-- [ ] T085 [P] [US2] Create `cqcode-formatter.ts` in `frontend/src/utils/cqcode-formatter.ts` (format CQ code for display)
-- [ ] T086 [P] [US2] Implement Chinese label mapping in `cqcode-formatter.ts` (face→"表情", image→"图片", etc.)
+- [X] T085 [P] [US2] Create `cqcode-formatter.ts` in `frontend/src/utils/cqcode-formatter.ts` (format CQ code for display)
+- [X] T086 [P] [US2] Implement Chinese label mapping in `cqcode-formatter.ts` (face→"表情", image→"图片", etc.)
 - [ ] T087 [P] [US2] Implement unit tests for `cqcode-formatter.spec.ts` in `frontend/src/tests/unit/cqcode-formatter.spec.ts`
 
 **Checkpoint**: At this point, User Stories 1 AND 2 should both work independently. Administrators can create CQ code rules via UI, and statistics still auto-reply for every message.
