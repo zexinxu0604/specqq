@@ -60,6 +60,10 @@
             <stringProp name="Header.name">Accept</stringProp>
             <stringProp name="Header.value">application/json</stringProp>
           </elementProp>
+          <elementProp name="" elementType="Header">
+            <stringProp name="Header.name">Authorization</stringProp>
+            <stringProp name="Header.value">Bearer ${__P(jwt_token,)}</stringProp>
+          </elementProp>
         </collectionProp>
       </HeaderManager>
       <hashTree/>
@@ -121,7 +125,7 @@
           <hashTree/>
 
           <!-- Duration Assertion: Parse should be < 10ms -->
-          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Parse Duration < 10ms" enabled="true">
+          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Parse Duration &lt; 10ms" enabled="true">
             <stringProp name="DurationAssertion.duration">10</stringProp>
           </DurationAssertion>
           <hashTree/>
@@ -169,7 +173,7 @@
           <hashTree/>
 
           <!-- Duration Assertion: Statistics calculation should be < 50ms -->
-          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Statistics Duration < 50ms" enabled="true">
+          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="Statistics Duration &lt; 50ms" enabled="true">
             <stringProp name="DurationAssertion.duration">50</stringProp>
           </DurationAssertion>
           <hashTree/>
@@ -217,7 +221,7 @@
           <hashTree/>
 
           <!-- Duration Assertion: End-to-end API should be < 200ms -->
-          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="API Duration < 200ms" enabled="true">
+          <DurationAssertion guiclass="DurationAssertionGui" testclass="DurationAssertion" testname="API Duration &lt; 200ms" enabled="true">
             <stringProp name="DurationAssertion.duration">200</stringProp>
           </DurationAssertion>
           <hashTree/>

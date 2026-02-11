@@ -75,6 +75,25 @@ check_health() {
     print_info "应用健康检查通过 ✓"
 }
 
+# 获取JWT Token
+get_jwt_token() {
+    print_info "获取JWT认证令牌..."
+
+    LOGIN_URL="http://${HOST}:${PORT}/api/auth/login"
+    LOGIN_DATA='{"username":"admin","password":"admin123"}'
+
+    JWT_TOKEN=$(curl -s -X POST "$LOGIN_URL" \
+        -H 'Content-Type: application/json' \
+        -d "$LOGIN_DATA" | jq -r '.data.accessToken')
+
+    if [ -z "$JWT_TOKEN" ] || [ "$JWT_TOKEN" = "null" ]; then
+        print_error "获取JWT令牌失败，请检查admin用户是否存在"
+        exit 1
+    fi
+
+    print_info "JWT令牌获取成功 ✓"
+}
+
 # 创建结果目录
 prepare_results_dir() {
     print_info "准备结果目录: ${RESULTS_DIR}"
@@ -100,7 +119,8 @@ run_test() {
         -Jport="$PORT" \
         -JCONCURRENT_USERS="$CONCURRENT_USERS" \
         -JRAMP_UP_PERIOD="$RAMP_UP_PERIOD" \
-        -JLOOP_COUNT="$LOOP_COUNT"
+        -JLOOP_COUNT="$LOOP_COUNT" \
+        -Jjwt_token="$JWT_TOKEN"
 
     if [ $? -eq 0 ]; then
         print_info "测试完成 ✓"
@@ -231,6 +251,7 @@ main() {
 
     check_jmeter
     check_health
+    get_jwt_token
     prepare_results_dir
     run_test
     analyze_results
