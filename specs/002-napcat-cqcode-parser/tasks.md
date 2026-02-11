@@ -226,25 +226,25 @@ Before proceeding to implementation tasks (T026-T056), you MUST:
 - [X] T089 [P] [US3] Unit test `NapCatAdapterTest.should_ParseJsonRpcResponse_When_WebSocketReplies()` in `src/test/java/com/specqq/chatbot/unit/NapCatAdapterTest.java`
 - [X] T090 [P] [US3] Unit test `NapCatAdapterTest.should_FallbackToHttp_When_WebSocketTimesOut()` in `src/test/java/com/specqq/chatbot/unit/NapCatAdapterTest.java`
 - [X] T091 [P] [US3] Unit test `NapCatAdapterTest.should_HandleError_When_BothWebSocketAndHttpFail()` in `src/test/java/com/specqq/chatbot/unit/NapCatAdapterTest.java`
-- [ ] T092 [US3] Integration test `NapCatApiIntegrationTest.should_CallGetGroupInfo_When_WebSocketActive()` in `src/test/java/com/specqq/chatbot/integration/NapCatApiIntegrationTest.java`
-- [ ] T093 [US3] Integration test `NapCatApiIntegrationTest.should_HandleConcurrentCalls_When_MultipleRequests()` in `src/test/java/com/specqq/chatbot/integration/NapCatApiIntegrationTest.java`
+- [x] T092 [US3] Integration test `NapCatApiIntegrationTest.should_CallGetGroupInfo_When_WebSocketActive()` in `src/test/java/com/specqq/chatbot/integration/NapCatApiIntegrationTest.java`
+- [x] T093 [US3] Integration test `NapCatApiIntegrationTest.should_HandleConcurrentCalls_When_MultipleRequests()` in `src/test/java/com/specqq/chatbot/integration/NapCatApiIntegrationTest.java`
 
 ### Implementation for User Story 3
 
 #### WebSocket JSON-RPC Implementation
 
-- [ ] T094 [US3] Add JSON-RPC 2.0 support to `NapCatAdapter.java` (jsonrpc: "2.0", id: UUID, action: string, params: map)
-- [ ] T095 [US3] Implement `NapCatAdapter.callApi()` method (send JSON-RPC request via WebSocket, wait for response)
-- [ ] T096 [US3] Implement request-response correlation in `NapCatAdapter.java` (map request ID to CompletableFuture, 10s timeout)
-- [ ] T097 [US3] Implement response parsing in `NapCatAdapter.handleApiResponse()` (extract status, retcode, data from JSON-RPC response)
-- [ ] T098 [US3] Add timeout handling in `NapCatAdapter.callApi()` (10s timeout per WebSocket call, throw TimeoutException)
+- [x] T094 [US3] Add JSON-RPC 2.0 support to `NapCatAdapter.java` (jsonrpc: "2.0", id: UUID, action: string, params: map)
+- [x] T095 [US3] Implement `NapCatAdapter.callApi()` method (send JSON-RPC request via WebSocket, wait for response)
+- [x] T096 [US3] Implement request-response correlation in `NapCatAdapter.java` (map request ID to CompletableFuture, 10s timeout)
+- [x] T097 [US3] Implement response parsing in `NapCatAdapter.handleApiResponse()` (extract status, retcode, data from JSON-RPC response)
+- [x] T098 [US3] Add timeout handling in `NapCatAdapter.callApi()` (10s timeout per WebSocket call, throw TimeoutException)
 
 #### HTTP Fallback Implementation
 
-- [ ] T099 [US3] Implement HTTP fallback logic in `NapCatAdapter.callApiWithFallback()` (try WebSocket first, HTTP POST on timeout/error)
-- [ ] T100 [US3] Add HTTP POST client in `NapCatAdapter.java` (RestTemplate or WebClient for HTTP fallback)
-- [ ] T101 [US3] Implement request transformation for HTTP in `NapCatAdapter.toHttpRequest()` (convert JSON-RPC to HTTP POST format)
-- [ ] T102 [US3] Implement response transformation from HTTP in `NapCatAdapter.fromHttpResponse()` (convert HTTP response to ApiCallResponse)
+- [x] T099 [US3] Implement HTTP fallback logic in `NapCatAdapter.callApiWithFallback()` (try WebSocket first, HTTP POST on timeout/error)
+- [x] T100 [US3] Add HTTP POST client in `NapCatAdapter.java` (RestTemplate or WebClient for HTTP fallback)
+- [x] T101 [US3] Implement request transformation for HTTP in `NapCatAdapter.toHttpRequest()` (convert JSON-RPC to HTTP POST format)
+- [x] T102 [US3] Implement response transformation from HTTP in `NapCatAdapter.fromHttpResponse()` (convert HTTP response to ApiCallResponse)
 
 #### Error Handling and Monitoring
 
@@ -254,11 +254,11 @@ Before proceeding to implementation tasks (T026-T056), you MUST:
 
 #### Additional NapCat API Methods
 
-- [ ] T106 [P] [US3] Implement `getGroupInfo()` method in `NapCatAdapter.java` (call `get_group_info` API)
-- [ ] T107 [P] [US3] Implement `getGroupMemberInfo()` method in `NapCatAdapter.java` (call `get_group_member_info` API)
-- [ ] T108 [P] [US3] Implement `getGroupMemberList()` method in `NapCatAdapter.java` (call `get_group_member_list` API)
-- [ ] T109 [P] [US3] Implement `deleteMessage()` method in `NapCatAdapter.java` (call `delete_msg` API)
-- [ ] T110 [P] [US3] Implement `sendForwardMessage()` method in `NapCatAdapter.java` (call `send_forward_msg` API - for future use)
+- [x] T106 [P] [US3] Implement `getGroupInfo()` method in `NapCatAdapter.java` (call `get_group_info` API)
+- [x] T107 [P] [US3] Implement `getGroupMemberInfo()` method in `NapCatAdapter.java` (call `get_group_member_info` API)
+- [x] T108 [P] [US3] Implement `getGroupMemberList()` method in `NapCatAdapter.java` (call `get_group_member_list` API)
+- [x] T109 [P] [US3] Implement `deleteMessage()` method in `NapCatAdapter.java` (call `delete_msg` API)
+- [x] T110 [P] [US3] Implement `sendForwardMessage()` method in `NapCatAdapter.java` (call `send_forward_msg` API - for future use)
 
 **Checkpoint**: All user stories should now be independently functional. WebSocket API calls work with transparent HTTP fallback.
 

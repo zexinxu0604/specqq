@@ -17,11 +17,13 @@ import java.util.regex.PatternSyntaxException;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class RegexMatcher implements RuleMatcher {
 
-    @Qualifier("compiledPatternsCaffeine")
     private final Cache<String, Pattern> patternCache;
+
+    public RegexMatcher(@Qualifier("compiledPatternsCaffeine") Cache<String, Pattern> patternCache) {
+        this.patternCache = patternCache;
+    }
 
     @Override
     public boolean matches(String message, String pattern) {

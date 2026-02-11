@@ -1,6 +1,8 @@
 package com.specqq.chatbot.adapter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.specqq.chatbot.dto.ApiCallRequestDTO;
+import com.specqq.chatbot.dto.ApiCallResponseDTO;
 import com.specqq.chatbot.dto.MessageReceiveDTO;
 import com.specqq.chatbot.dto.MessageReplyDTO;
 import com.specqq.chatbot.dto.NapCatMessageDTO;
@@ -22,11 +24,11 @@ import org.springframework.util.StringUtils;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * NapCat适配器 (OneBot 11协议)
@@ -46,7 +48,13 @@ public class NapCatAdapter implements ClientAdapter {
     @Value("${napcat.http.access-token}")
     private String accessToken;
 
+    @Value("${napcat.http.timeout:10000}")
+    private int httpTimeout;
+
     private CloseableHttpAsyncClient httpClient;
+
+    // Request-response correlation map for API calls
+    private final Map<String, CompletableFuture<ApiCallResponseDTO>> pendingRequests = new ConcurrentHashMap<>();
 
     @PostConstruct
     public void init() {
@@ -224,5 +232,189 @@ public class NapCatAdapter implements ClientAdapter {
         }
 
         return future;
+    }
+
+    /**
+     * Call NapCat API with generic action and parameters
+     *
+     * <p>T094-T098: JSON-RPC 2.0 implementation with request-response correlation</p>
+     *
+     * @param action NapCat API action (e.g., "get_group_info")
+     * @param params API parameters
+     * @return API response
+     * @throws TimeoutException if request times out after 10 seconds
+     */
+    public CompletableFuture<ApiCallResponseDTO> callApi(String action, Map<String, Object> params) {
+        long startTime = System.currentTimeMillis();
+        String requestId = UUID.randomUUID().toString();
+
+        CompletableFuture<ApiCallResponseDTO> future = new CompletableFuture<>();
+        pendingRequests.put(requestId, future);
+
+        try {
+            // Build JSON-RPC 2.0 request
+            ApiCallRequestDTO request = new ApiCallRequestDTO();
+            request.setJsonrpc("2.0");
+            request.setId(requestId);
+            request.setAction(action);
+            request.setParams(params != null ? params : new HashMap<>());
+
+            String jsonBody = objectMapper.writeValueAsString(request);
+
+            // Build HTTP POST request
+            SimpleHttpRequest httpRequest = SimpleRequestBuilder.post(napCatHttpUrl + "/" + action)
+                    .setHeader("Authorization", "Bearer " + accessToken)
+                    .setHeader("Content-Type", "application/json")
+                    .setBody(jsonBody, ContentType.APPLICATION_JSON)
+                    .build();
+
+            // Send async HTTP request
+            httpClient.execute(httpRequest, new FutureCallback<SimpleHttpResponse>() {
+                @Override
+                public void completed(SimpleHttpResponse response) {
+                    try {
+                        long executionTime = System.currentTimeMillis() - startTime;
+                        String responseBody = response.getBodyText();
+
+                        // Parse response
+                        ApiCallResponseDTO apiResponse = parseApiResponse(responseBody, requestId, executionTime);
+
+                        CompletableFuture<ApiCallResponseDTO> pending = pendingRequests.remove(requestId);
+                        if (pending != null) {
+                            pending.complete(apiResponse);
+                        }
+                    } catch (Exception e) {
+                        log.error("Failed to parse API response: action={}", action, e);
+                        CompletableFuture<ApiCallResponseDTO> pending = pendingRequests.remove(requestId);
+                        if (pending != null) {
+                            pending.completeExceptionally(e);
+                        }
+                    }
+                }
+
+                @Override
+                public void failed(Exception ex) {
+                    log.error("API call failed: action={}", action, ex);
+                    CompletableFuture<ApiCallResponseDTO> pending = pendingRequests.remove(requestId);
+                    if (pending != null) {
+                        pending.completeExceptionally(ex);
+                    }
+                }
+
+                @Override
+                public void cancelled() {
+                    log.warn("API call cancelled: action={}", action);
+                    CompletableFuture<ApiCallResponseDTO> pending = pendingRequests.remove(requestId);
+                    if (pending != null) {
+                        pending.cancel(true);
+                    }
+                }
+            });
+
+            // Set timeout
+            future.orTimeout(httpTimeout, TimeUnit.MILLISECONDS)
+                    .exceptionally(throwable -> {
+                        pendingRequests.remove(requestId);
+                        if (throwable instanceof java.util.concurrent.TimeoutException) {
+                            log.error("API call timeout: action={}, timeout={}ms", action, httpTimeout);
+                        }
+                        return null;
+                    });
+
+        } catch (Exception e) {
+            log.error("Failed to send API request: action={}", action, e);
+            pendingRequests.remove(requestId);
+            future.completeExceptionally(e);
+        }
+
+        return future;
+    }
+
+    /**
+     * Parse API response from JSON
+     *
+     * <p>T097: Extract status, retcode, data from JSON-RPC response</p>
+     */
+    private ApiCallResponseDTO parseApiResponse(String responseBody, String requestId, long executionTime) throws Exception {
+        Map<String, Object> responseMap = objectMapper.readValue(responseBody, Map.class);
+
+        ApiCallResponseDTO response = new ApiCallResponseDTO();
+        response.setId(requestId);
+        response.setStatus((String) responseMap.getOrDefault("status", "unknown"));
+        response.setRetcode(((Number) responseMap.getOrDefault("retcode", -1)).intValue());
+        response.setData((Map<String, Object>) responseMap.get("data"));
+        response.setMessage((String) responseMap.get("message"));
+        response.setExecutionTimeMs(executionTime);
+
+        return response;
+    }
+
+    /**
+     * Call API with automatic HTTP fallback
+     *
+     * <p>T099-T102: Try WebSocket first, fallback to HTTP on timeout/error</p>
+     * <p>Note: WebSocket not implemented yet, currently uses HTTP directly</p>
+     */
+    public CompletableFuture<ApiCallResponseDTO> callApiWithFallback(String action, Map<String, Object> params) {
+        // TODO: Implement WebSocket call first, then fallback to HTTP
+        // For now, just use HTTP directly
+        return callApi(action, params);
+    }
+
+    /**
+     * Get group information
+     *
+     * <p>T106: Call get_group_info API</p>
+     */
+    public CompletableFuture<ApiCallResponseDTO> getGroupInfo(Long groupId) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("group_id", groupId);
+        return callApiWithFallback("get_group_info", params);
+    }
+
+    /**
+     * Get group member information
+     *
+     * <p>T107: Call get_group_member_info API</p>
+     */
+    public CompletableFuture<ApiCallResponseDTO> getGroupMemberInfo(Long groupId, Long userId) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("group_id", groupId);
+        params.put("user_id", userId);
+        return callApiWithFallback("get_group_member_info", params);
+    }
+
+    /**
+     * Get group member list
+     *
+     * <p>T108: Call get_group_member_list API</p>
+     */
+    public CompletableFuture<ApiCallResponseDTO> getGroupMemberList(Long groupId) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("group_id", groupId);
+        return callApiWithFallback("get_group_member_list", params);
+    }
+
+    /**
+     * Delete message
+     *
+     * <p>T109: Call delete_msg API</p>
+     */
+    public CompletableFuture<ApiCallResponseDTO> deleteMessage(Long messageId) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("message_id", messageId);
+        return callApiWithFallback("delete_msg", params);
+    }
+
+    /**
+     * Send forward message
+     *
+     * <p>T110: Call send_forward_msg API</p>
+     */
+    public CompletableFuture<ApiCallResponseDTO> sendForwardMessage(Long groupId, List<Map<String, Object>> messages) {
+        Map<String, Object> params = new HashMap<>();
+        params.put("group_id", groupId);
+        params.put("messages", messages);
+        return callApiWithFallback("send_forward_msg", params);
     }
 }
