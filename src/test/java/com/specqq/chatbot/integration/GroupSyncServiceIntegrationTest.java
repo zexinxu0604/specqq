@@ -50,8 +50,16 @@ class GroupSyncServiceIntegrationTest {
         // 创建测试客户端
         testClient = new ChatClient();
         testClient.setClientName("Test NapCat Client");
+        testClient.setClientType("qq");
         testClient.setProtocolType("napcat");
-        testClient.setHost("http://localhost:3000");
+
+        ChatClient.ConnectionConfig config = new ChatClient.ConnectionConfig();
+        config.setHost("localhost");
+        config.setHttpPort(3000);
+        config.setWsPort(3001);
+        config.setAccessToken("test-token");
+        testClient.setConnectionConfig(config);
+
         testClient.setEnabled(true);
         chatClientMapper.insert(testClient);
 

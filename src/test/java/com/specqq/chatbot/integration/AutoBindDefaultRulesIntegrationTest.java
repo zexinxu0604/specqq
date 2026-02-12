@@ -77,8 +77,16 @@ class AutoBindDefaultRulesIntegrationTest {
         // 创建测试客户端
         testClient = new ChatClient();
         testClient.setClientName("Test NapCat");
+        testClient.setClientType("qq");
         testClient.setProtocolType("napcat");
-        testClient.setHost("http://localhost:3000");
+
+        ChatClient.ConnectionConfig connectionConfig = new ChatClient.ConnectionConfig();
+        connectionConfig.setHost("localhost");
+        connectionConfig.setHttpPort(3000);
+        connectionConfig.setWsPort(3001);
+        connectionConfig.setAccessToken("test-token");
+        testClient.setConnectionConfig(connectionConfig);
+
         testClient.setEnabled(true);
         chatClientMapper.insert(testClient);
     }

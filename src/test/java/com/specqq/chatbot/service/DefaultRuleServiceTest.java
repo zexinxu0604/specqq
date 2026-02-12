@@ -190,7 +190,7 @@ class DefaultRuleServiceTest {
 
         // Then
         assertThat(bindCount).isEqualTo(0);
-        verify(groupRuleConfigMapper, never()).insert(any());
+        verify(groupRuleConfigMapper, never()).insert(any(GroupRuleConfig.class));
     }
 
     @Test

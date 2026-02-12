@@ -102,7 +102,7 @@ class SystemConfigServiceTest {
                 eq(SystemConfigKeys.DEFAULT_GROUP_RULES),
                 eq("{\"ruleIds\":[1,2]}")
         );
-        verify(systemConfigMapper, never()).insert(any());
+        verify(systemConfigMapper, never()).insert(any(SystemConfig.class));
     }
 
     @Test

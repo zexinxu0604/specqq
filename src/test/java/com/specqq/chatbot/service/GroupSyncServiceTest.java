@@ -2,6 +2,8 @@ package com.specqq.chatbot.service;
 
 import com.specqq.chatbot.adapter.ClientAdapter;
 import com.specqq.chatbot.adapter.ClientAdapterFactory;
+import com.specqq.chatbot.adapter.NapCatAdapter;
+import com.specqq.chatbot.dto.ApiCallResponseDTO;
 import com.specqq.chatbot.dto.BatchSyncResultDTO;
 import com.specqq.chatbot.dto.GroupSyncResultDTO;
 import com.specqq.chatbot.entity.ChatClient;
@@ -17,11 +19,11 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
@@ -43,7 +45,7 @@ class GroupSyncServiceTest {
     private ClientAdapterFactory clientAdapterFactory;
 
     @Mock
-    private ClientAdapter clientAdapter;
+    private NapCatAdapter napCatAdapter;
 
     private GroupSyncService groupSyncService;
 
@@ -71,8 +73,8 @@ class GroupSyncServiceTest {
     @DisplayName("同步单个群组 - 成功场景")
     void testSyncGroup_Success() {
         // Given
-        when(clientAdapterFactory.getAdapter(any(ChatClient.class))).thenReturn(clientAdapter);
-        when(clientAdapter.getGroupInfo(anyString())).thenReturn(createGroupInfo(50));
+        when(clientAdapterFactory.getAdapter(testClient.getProtocolType())).thenReturn(napCatAdapter);
+        when(napCatAdapter.getGroupInfo(anyLong())).thenReturn(createGroupInfo(50));
 
         // When
         GroupSyncResultDTO result = groupSyncService.syncGroup(testGroup);
@@ -92,8 +94,8 @@ class GroupSyncServiceTest {
     @DisplayName("同步单个群组 - 失败场景（网络异常）")
     void testSyncGroup_Failure_NetworkError() {
         // Given
-        when(clientAdapterFactory.getAdapter(any(ChatClient.class))).thenReturn(clientAdapter);
-        when(clientAdapter.getGroupInfo(anyString())).thenThrow(new RuntimeException("Network timeout"));
+        when(clientAdapterFactory.getAdapter(testClient.getProtocolType())).thenReturn(napCatAdapter);
+        when(napCatAdapter.getGroupInfo(anyLong())).thenThrow(new RuntimeException("Network timeout"));
 
         // When
         GroupSyncResultDTO result = groupSyncService.syncGroup(testGroup);
@@ -117,8 +119,8 @@ class GroupSyncServiceTest {
     @DisplayName("同步单个群组 - 失败场景（机器人已被移出）")
     void testSyncGroup_Failure_BotRemoved() {
         // Given
-        when(clientAdapterFactory.getAdapter(any(ChatClient.class))).thenReturn(clientAdapter);
-        when(clientAdapter.getGroupInfo(anyString())).thenReturn(null); // Bot not in group
+        when(clientAdapterFactory.getAdapter(testClient.getProtocolType())).thenReturn(napCatAdapter);
+        when(napCatAdapter.getGroupInfo(anyLong())).thenReturn(null); // Bot not in group
 
         // When
         GroupSyncResultDTO result = groupSyncService.syncGroup(testGroup);
@@ -140,10 +142,10 @@ class GroupSyncServiceTest {
         GroupChat group3 = createTestGroup(3L, "333333", "Group 3");
         List<GroupChat> groups = Arrays.asList(group1, group2, group3);
 
-        when(clientAdapterFactory.getAdapter(any(ChatClient.class))).thenReturn(clientAdapter);
-        when(clientAdapter.getGroupInfo("111111")).thenReturn(createGroupInfo(30));
-        when(clientAdapter.getGroupInfo("222222")).thenThrow(new RuntimeException("Timeout"));
-        when(clientAdapter.getGroupInfo("333333")).thenReturn(createGroupInfo(50));
+        when(clientAdapterFactory.getAdapter(testClient.getProtocolType())).thenReturn(napCatAdapter);
+        when(napCatAdapter.getGroupInfo(111111L)).thenReturn(createGroupInfo(30));
+        when(napCatAdapter.getGroupInfo(222222L)).thenThrow(new RuntimeException("Timeout"));
+        when(napCatAdapter.getGroupInfo(333333L)).thenReturn(createGroupInfo(50));
 
         // When
         BatchSyncResultDTO result = groupSyncService.batchSyncGroups(groups);
@@ -164,8 +166,8 @@ class GroupSyncServiceTest {
         GroupChat group1 = createTestGroup(1L, "111111", "Group 1");
         GroupChat group2 = createTestGroup(2L, "222222", "Group 2");
         when(groupChatMapper.selectActiveGroups()).thenReturn(Arrays.asList(group1, group2));
-        when(clientAdapterFactory.getAdapter(any(ChatClient.class))).thenReturn(clientAdapter);
-        when(clientAdapter.getGroupInfo(anyString())).thenReturn(createGroupInfo(40));
+        when(clientAdapterFactory.getAdapter(testClient.getProtocolType())).thenReturn(napCatAdapter);
+        when(napCatAdapter.getGroupInfo(anyLong())).thenReturn(createGroupInfo(40));
 
         // When
         BatchSyncResultDTO result = groupSyncService.syncAllActiveGroups();
@@ -186,8 +188,8 @@ class GroupSyncServiceTest {
         failedGroup.setSyncStatus(SyncStatus.FAILED);
         failedGroup.setConsecutiveFailureCount(3);
         when(groupChatMapper.selectFailedGroups(3)).thenReturn(Collections.singletonList(failedGroup));
-        when(clientAdapterFactory.getAdapter(any(ChatClient.class))).thenReturn(clientAdapter);
-        when(clientAdapter.getGroupInfo(anyString())).thenReturn(createGroupInfo(35));
+        when(clientAdapterFactory.getAdapter(testClient.getProtocolType())).thenReturn(napCatAdapter);
+        when(napCatAdapter.getGroupInfo(anyLong())).thenReturn(createGroupInfo(35));
 
         // When
         BatchSyncResultDTO result = groupSyncService.retryFailedGroups(3);
@@ -256,15 +258,16 @@ class GroupSyncServiceTest {
         return group;
     }
 
-    private Object createGroupInfo(int memberCount) {
-        // Simplified group info object
-        return new Object() {
-            public int getMemberCount() {
-                return memberCount;
-            }
-            public String getGroupName() {
-                return "Test Group";
-            }
-        };
+    private CompletableFuture<ApiCallResponseDTO> createGroupInfo(int memberCount) {
+        ApiCallResponseDTO response = new ApiCallResponseDTO();
+        response.setStatus("ok");
+        response.setRetcode(0);
+
+        Map<String, Object> data = new HashMap<>();
+        data.put("member_count", memberCount);
+        data.put("group_name", "Test Group");
+        response.setData(data);
+
+        return CompletableFuture.completedFuture(response);
     }
 }
