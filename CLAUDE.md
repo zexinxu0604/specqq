@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Chatbot Router System** - A QQ group chatbot management system with rule-based message routing, built with Spring Boot 3.x and Vue 3. The system receives messages from chat clients (primarily NapCatQQ), routes them through a rule engine, and sends automated replies.
 
-**Current Status**: v1.0.0-SNAPSHOT | MVP Complete | 84.3% Development Progress (75/89 tasks)
+**Current Status**: v1.0.0-SNAPSHOT | MVP Complete + Group Sync | 92.1% Development Progress (82/89 tasks)
 
 ## Architecture
 
@@ -63,6 +63,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Uses MyBatis-Plus 3.5.7 with custom XML mappers
 - Entities: `MessageRule`, `GroupChat`, `MessageLog`, `ChatClient`, `AdminUser`
 - Mappers in `src/main/resources/mapper/`
+
+**Group Sync System** (`Feature 004` - `src/main/java/com/specqq/chatbot/service/`):
+- `GroupSyncService`: Manages group information synchronization with NapCat
+- `GroupSyncScheduler`: Scheduled task for automatic sync (every 6 hours)
+- `DefaultRuleService`: Manages default rules for new groups
+- `SyncHealthIndicator`: Health check for sync operations (UP/DEGRADED/DOWN)
+- `MetricsService`: Prometheus metrics for sync operations
+- Key Features:
+  - Automatic sync of active groups (every 6 hours)
+  - Manual sync trigger via API
+  - Failed group retry with exponential backoff
+  - Alert system for groups with ≥3 consecutive failures
+  - Auto-discovery of new groups when bot joins
+  - Default rule auto-binding for new groups
+  - Comprehensive metrics and health monitoring
 
 ## Development Commands
 
@@ -283,6 +298,14 @@ npm run test:e2e          # Playwright E2E tests
 - GET `/{id}/rules` - Get group's rules
 - POST `/{id}/rules` - Bind rule to group
 - DELETE `/{id}/rules/{ruleId}` - Unbind rule
+
+**Group Sync** (`/api/groups/sync` - Feature 004):
+- POST `/trigger` - Manual trigger sync all active groups
+- POST `/retry?minFailureCount=1` - Retry failed groups
+- POST `/{groupId}` - Sync single group
+- GET `/alert` - Get groups needing alerts (≥3 failures)
+- POST `/{groupId}/reset` - Reset group failure count
+- POST `/discover/{clientId}` - Auto-discover new groups
 
 **Logs** (`/api/logs`):
 - GET `/` - List message logs (paginated, filterable)
