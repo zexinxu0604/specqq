@@ -200,10 +200,10 @@ public class RuleController {
         if (dto.getResponseTemplate() != null) {
             existing.setResponseTemplate(dto.getResponseTemplate());
         }
-        // 处理 handlerConfig：支持 null 或空字符串来清除配置
+        // 处理 handlerConfig：空字符串表示清除配置，设置为 "{}"
         if (dto.getHandlerConfig() != null) {
-            // 如果是空字符串，设置为 null 以清除配置
-            String handlerConfig = dto.getHandlerConfig().trim().isEmpty() ? null : dto.getHandlerConfig();
+            // 如果是空字符串，设置为 "{}" 表示空配置
+            String handlerConfig = dto.getHandlerConfig().trim().isEmpty() ? "{}" : dto.getHandlerConfig();
             existing.setHandlerConfig(handlerConfig);
         }
         if (dto.getEnabled() != null) {

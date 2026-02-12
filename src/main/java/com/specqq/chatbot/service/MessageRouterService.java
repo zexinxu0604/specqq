@@ -80,7 +80,9 @@ public class MessageRouterService {
             // Step 2: Get handler type from handler config
             // For now, use simple reply from response_template if handler not configured
             String handlerConfig = rule.getHandlerConfig();
-            if (handlerConfig == null || handlerConfig.isEmpty()) {
+
+            // 检查是否有有效的 handler 配置
+            if (!hasValidHandlerConfig(handlerConfig)) {
                 // Fallback to response_template for simple replies
                 String replyContent = rule.getResponseTemplate();
                 if (replyContent == null || replyContent.isEmpty()) {
@@ -227,6 +229,35 @@ public class MessageRouterService {
         } catch (Exception e) {
             log.error("Sync message routing failed: groupId={}", message.getGroupId(), e);
             return Optional.empty();
+        }
+    }
+
+    /**
+     * 检查是否有有效的 handler 配置
+     *
+     * @param handlerConfig handler 配置 JSON 字符串
+     * @return true 如果配置有效且包含 handlerType，false 否则
+     */
+    private boolean hasValidHandlerConfig(String handlerConfig) {
+        if (handlerConfig == null || handlerConfig.trim().isEmpty()) {
+            return false;
+        }
+
+        try {
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode node = mapper.readTree(handlerConfig);
+
+            // 检查是否是空对象或不包含 handlerType
+            if (!node.has("handlerType")) {
+                return false;
+            }
+
+            // 检查 handlerType 是否为空
+            String handlerType = node.get("handlerType").asText();
+            return handlerType != null && !handlerType.trim().isEmpty();
+        } catch (Exception e) {
+            log.warn("Invalid handler config JSON: {}", handlerConfig);
+            return false;
         }
     }
 

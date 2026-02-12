@@ -119,14 +119,14 @@ public class RuleService extends ServiceImpl<MessageRuleMapper, MessageRule> {
             .set(MessageRule::getMatchType, rule.getMatchType())
             .set(MessageRule::getPattern, rule.getPattern())
             .set(MessageRule::getResponseTemplate, rule.getResponseTemplate())
-            .set(MessageRule::getHandlerConfig, rule.getHandlerConfig())  // 支持 null
+            .set(MessageRule::getHandlerConfig, rule.getHandlerConfig())  // 支持设置为 "{}" 表示空配置
             .set(MessageRule::getOnErrorPolicy, rule.getOnErrorPolicy())
             .set(MessageRule::getPriority, rule.getPriority())
             .set(MessageRule::getEnabled, rule.getEnabled());
 
         messageRuleMapper.update(null, updateWrapper);
         log.info("Updated rule: id={}, name={}, handlerConfig={}", rule.getId(), rule.getName(),
-                 rule.getHandlerConfig() == null ? "NULL" : "SET");
+                 "{}".equals(rule.getHandlerConfig()) ? "EMPTY" : "SET");
         return rule;
     }
 
