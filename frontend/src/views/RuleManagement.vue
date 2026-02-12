@@ -93,9 +93,53 @@
           </template>
         </el-table-column>
 
-        <el-table-column prop="matchPattern" label="匹配模式" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="pattern" label="匹配模式" min-width="180" show-overflow-tooltip />
 
-        <el-table-column prop="replyTemplate" label="回复模板" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="responseTemplate" label="回复模板" min-width="200" show-overflow-tooltip />
+
+        <el-table-column label="策略摘要" min-width="180">
+          <template #default="{ row }">
+            <div v-if="row.policy" class="policy-summary">
+              <el-tag
+                v-if="row.policy.rateLimitEnabled"
+                size="small"
+                type="warning"
+                effect="plain"
+              >
+                限流: {{ row.policy.rateLimitMaxRequests }}/{{ row.policy.rateLimitWindowSeconds }}s
+              </el-tag>
+              <el-tag
+                v-if="row.policy.timeWindowEnabled"
+                size="small"
+                type="info"
+                effect="plain"
+              >
+                时间窗口
+              </el-tag>
+              <el-tag
+                v-if="row.policy.roleEnabled"
+                size="small"
+                type="success"
+                effect="plain"
+              >
+                角色限制
+              </el-tag>
+              <el-tag
+                v-if="row.policy.cooldownEnabled"
+                size="small"
+                effect="plain"
+              >
+                冷却: {{ row.policy.cooldownSeconds }}s
+              </el-tag>
+              <el-text v-if="!hasPolicyEnabled(row.policy)" size="small" type="info">
+                无限制
+              </el-text>
+            </div>
+            <el-text v-else size="small" type="info">
+              无限制
+            </el-text>
+          </template>
+        </el-table-column>
 
         <el-table-column prop="priority" label="优先级" width="100" sortable>
           <template #default="{ row }">
@@ -176,6 +220,7 @@
         ref="ruleFormRef"
         v-model="currentRule"
         :is-edit="isEdit"
+        :rule-id="currentRuleId"
       />
       <template #footer>
         <el-button @click="dialogVisible = false">取消</el-button>
@@ -201,6 +246,7 @@ import {
 import RuleForm from '@/components/RuleForm.vue'
 import {
   listRules,
+  getRuleById,
   createRule,
   updateRule,
   deleteRule,
@@ -211,6 +257,7 @@ import {
 import { useRulesStore } from '@/stores/rules.store'
 import { MatchType, MatchTypeLabels } from '@/types/rule'
 import type { Rule, CreateRuleRequest, UpdateRuleRequest } from '@/types/rule'
+import type { PolicyDTO } from '@/types/policy'
 
 const rulesStore = useRulesStore()
 
@@ -245,12 +292,15 @@ const ruleFormRef = ref()
 // 当前编辑的规则
 const currentRule = ref<CreateRuleRequest | UpdateRuleRequest>({
   name: '',
-  matchType: MatchType.KEYWORD,
-  matchPattern: '',
-  replyTemplate: '',
+  matchType: MatchType.CONTAINS,
+  pattern: '',
+  responseTemplate: '',
   priority: 50,
   description: ''
 })
+
+// 当前编辑规则的ID (单独存储)
+const currentRuleId = ref<number | undefined>(undefined)
 
 // 加载规则列表
 const loadRules = async () => {
@@ -292,11 +342,12 @@ const handleReset = () => {
 // 新建规则
 const handleCreate = () => {
   isEdit.value = false
+  currentRuleId.value = undefined
   currentRule.value = {
     name: '',
-    matchType: MatchType.KEYWORD,
-    matchPattern: '',
-    replyTemplate: '',
+    matchType: MatchType.CONTAINS,
+    pattern: '',
+    responseTemplate: '',
     priority: 50,
     description: ''
   }
@@ -304,19 +355,49 @@ const handleCreate = () => {
 }
 
 // 编辑规则
-const handleEdit = (rule: Rule) => {
+const handleEdit = async (rule: Rule) => {
+  console.log('编辑规则, ID:', rule.id, '规则:', rule)
   isEdit.value = true
-  currentRule.value = {
-    name: rule.name,
-    matchType: rule.matchType,
-    matchPattern: rule.matchPattern,
-    replyTemplate: rule.replyTemplate,
-    priority: rule.priority,
-    description: rule.description
+  currentRuleId.value = rule.id  // 单独存储ID
+
+  try {
+    // 获取完整的规则详情(包括policy)
+    const response = await getRuleById(rule.id)
+    const fullRule = response.data
+
+    // 解析 handlerConfig JSON 为 handlerType 和 handlerParams
+    let handlerType: string | undefined
+    let handlerParams: Record<string, any> = {}
+
+    if (fullRule.handlerConfig) {
+      try {
+        const config = typeof fullRule.handlerConfig === 'string'
+          ? JSON.parse(fullRule.handlerConfig)
+          : fullRule.handlerConfig
+        handlerType = config.handlerType
+        handlerParams = config.params || {}
+      } catch (e) {
+        console.warn('Failed to parse handlerConfig:', e)
+      }
+    }
+
+    currentRule.value = {
+      name: fullRule.name,
+      matchType: fullRule.matchType,
+      pattern: fullRule.pattern,
+      responseTemplate: fullRule.responseTemplate,
+      priority: fullRule.priority,
+      description: fullRule.description,
+      handlerType,
+      handlerParams,
+      policy: fullRule.policy
+    }
+    console.log('设置currentRuleId:', currentRuleId.value)
+    console.log('设置policy:', fullRule.policy)
+    dialogVisible.value = true
+  } catch (error: any) {
+    ElMessage.error(error.message || '获取规则详情失败')
   }
-  // 保存原始ID用于更新
-  ;(currentRule.value as any)._id = rule.id
-  dialogVisible.value = true
 }
 
 // 提交表单
@@ -327,12 +408,31 @@ const handleSubmit = async () => {
 
   submitting.value = true
   try {
+    // 准备提交数据：将 handlerType 和 handlerParams 转换为 handlerConfig JSON 字符串
+    const submitData: any = { ...currentRule.value }
+
+    // 如果有 handlerType，构建 handlerConfig JSON
+    if (submitData.handlerType) {
+      submitData.handlerConfig = JSON.stringify({
+        handlerType: submitData.handlerType,
+        params: submitData.handlerParams || {}
+      })
+      // 删除前端专用字段
+      delete submitData.handlerType
+      delete submitData.handlerParams
+    }
+
     if (isEdit.value) {
-      const id = (currentRule.value as any)._id
-      await updateRule(id, currentRule.value)
+      if (!currentRuleId.value) {
+        ElMessage.error('规则ID不存在,无法更新')
+        return
+      }
+      console.log('更新规则, ID:', currentRuleId.value, '数据:', submitData)
+      await updateRule(currentRuleId.value, submitData)
       ElMessage.success('规则更新成功')
     } else {
-      await createRule(currentRule.value as CreateRuleRequest)
+      console.log('创建规则, 数据:', submitData)
+      await createRule(submitData as CreateRuleRequest)
       ElMessage.success('规则创建成功')
     }
 
@@ -422,7 +522,7 @@ const handleSelectionChange = (selection: Rule[]) => {
 // 匹配类型颜色
 const getMatchTypeColor = (type: MatchType): string => {
   const colors: Record<MatchType, string> = {
-    [MatchType.KEYWORD]: '',
+    [MatchType.CONTAINS]: '',
     [MatchType.REGEX]: 'warning',
     [MatchType.PREFIX]: 'success',
     [MatchType.SUFFIX]: 'info',
@@ -452,6 +552,19 @@ const formatDateTime = (dateTime: string): string => {
   })
 }
 
+// Check if any policy is enabled
+const hasPolicyEnabled = (policy: PolicyDTO | undefined): boolean => {
+  if (!policy) return false
+  return !!(
+    policy.rateLimitEnabled ||
+    policy.timeWindowEnabled ||
+    policy.roleEnabled ||
+    policy.cooldownEnabled ||
+    (policy.whitelist && policy.whitelist.length > 0) ||
+    (policy.blacklist && policy.blacklist.length > 0)
+  )
+}
+
 // 组件挂载时加载数据
 onMounted(() => {
   loadRules()
@@ -468,6 +581,12 @@ onMounted(() => {
     .el-form {
       margin-bottom: 0;
     }
+  }
+
+  .policy-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
   }
 }
 </style>

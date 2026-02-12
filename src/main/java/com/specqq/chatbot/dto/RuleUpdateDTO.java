@@ -126,7 +126,7 @@ public class RuleUpdateDTO {
         @Schema(description = "时间窗口结束时间", example = "18:00:00")
         private String timeWindowEnd;
 
-        @Pattern(regexp = "^[1-7](,[1-7])*$", message = "工作日格式错误，应为逗号分隔的1-7数字")
+        @Pattern(regexp = "^$|^[1-7](,[1-7])*$", message = "工作日格式错误，应为逗号分隔的1-7数字")
         @Schema(description = "工作日 (1-7, 逗号分隔)", example = "1,2,3,4,5")
         private String timeWindowWeekdays;
 

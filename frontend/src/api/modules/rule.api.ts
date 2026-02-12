@@ -23,8 +23,21 @@ export function listRules(params: RuleQueryParams) {
 /**
  * 根据ID查询规则
  */
-export function getRuleById(id: number) {
-  return get<Rule>(`/api/rules/${id}`)
+export async function getRuleById(id: number) {
+  const response = await get<any>(`/api/rules/${id}`)
+  // 映射后端字段名到前端字段名
+  if (response.data) {
+    return {
+      ...response,
+      data: {
+        ...response.data,
+        name: response.data.ruleName || response.data.name,
+        createdAt: response.data.createTime || response.data.createdAt,
+        updatedAt: response.data.updateTime || response.data.updatedAt
+      }
+    }
+  }
+  return response
 }
 
 /**

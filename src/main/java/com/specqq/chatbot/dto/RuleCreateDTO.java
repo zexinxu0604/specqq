@@ -50,6 +50,14 @@ public class RuleCreateDTO {
     private String pattern;
 
     /**
+     * 回复模板
+     */
+    @NotBlank(message = "回复模板不能为空")
+    @Size(max = 1000, message = "回复模板长度不能超过1000个字符")
+    @Schema(description = "回复模板", example = "你好呀！很高兴见到你！", required = true)
+    private String responseTemplate;
+
+    /**
      * 优先级 (1-1000, 数字越小优先级越高)
      */
     @NotNull(message = "优先级不能为空")
@@ -130,7 +138,7 @@ public class RuleCreateDTO {
         @Schema(description = "时间窗口结束时间", example = "18:00:00")
         private String timeWindowEnd;
 
-        @Pattern(regexp = "^[1-7](,[1-7])*$", message = "工作日格式错误，应为逗号分隔的1-7数字")
+        @Pattern(regexp = "^$|^[1-7](,[1-7])*$", message = "工作日格式错误，应为逗号分隔的1-7数字")
         @Schema(description = "工作日 (1-7, 逗号分隔)", example = "1,2,3,4,5")
         private String timeWindowWeekdays;
 

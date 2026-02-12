@@ -58,18 +58,19 @@ public class RuleController {
      * 根据ID查询规则详情
      */
     @GetMapping("/{id}")
-    @Operation(summary = "查询规则详情", description = "根据规则ID查询详细信息")
-    public Result<MessageRule> getRuleById(
+    @Operation(summary = "查询规则详情", description = "根据规则ID查询详细信息，包含策略配置")
+    public Result<RuleDetailVO> getRuleById(
         @Parameter(description = "规则ID") @PathVariable Long id
     ) {
         log.info("查询规则详情: id={}", id);
 
-        MessageRule rule = ruleService.getRuleById(id);
-        if (rule == null) {
+        RuleService.RuleWithPolicy ruleWithPolicy = ruleService.getRuleWithPolicy(id);
+        if (ruleWithPolicy == null || ruleWithPolicy.rule() == null) {
             return Result.error(ResultCode.RULE_NOT_FOUND);
         }
 
-        return Result.success(rule);
+        RuleDetailVO vo = buildRuleDetailVO(ruleWithPolicy.rule(), ruleWithPolicy.policy());
+        return Result.success(vo);
     }
 
     /**
@@ -78,10 +79,22 @@ public class RuleController {
     @PostMapping
     @Operation(summary = "创建规则", description = "创建新的消息匹配规则")
     public Result<MessageRule> createRule(
-        @Valid @RequestBody MessageRule rule
+        @Valid @RequestBody RuleCreateDTO dto
     ) {
         log.info("创建规则: name={}, matchType={}, pattern={}",
-            rule.getName(), rule.getMatchType(), rule.getPattern());
+            dto.getRuleName(), dto.getMatchType(), dto.getPattern());
+
+        // 构建 MessageRule 实体
+        MessageRule rule = new MessageRule();
+        rule.setName(dto.getRuleName());
+        rule.setDescription(dto.getDescription());
+        // 转换 MatchType 枚举
+        rule.setMatchType(MessageRule.MatchType.valueOf(dto.getMatchType().name()));
+        rule.setPattern(dto.getPattern());
+        rule.setResponseTemplate(dto.getResponseTemplate());
+        rule.setPriority(dto.getPriority());
+        rule.setHandlerConfig(dto.getHandlerConfig());
+        rule.setEnabled(dto.getEnabled());
 
         // 验证规则名称唯一性
         if (ruleService.existsByName(rule.getName())) {
@@ -95,8 +108,54 @@ public class RuleController {
             }
         }
 
+        // 创建规则
         MessageRule created = ruleService.createRule(rule);
+
+        // 保存 policy（如果提供）
+        if (dto.getPolicy() != null) {
+            try {
+                RulePolicy policy = convertPolicyDTO(dto.getPolicy(), created.getId());
+                policyService.saveOrUpdatePolicy(policy);
+                log.info("Policy saved for rule: ruleId={}", created.getId());
+            } catch (Exception e) {
+                log.error("Failed to save policy for rule: ruleId={}", created.getId(), e);
+                // Policy 保存失败不影响规则创建
+            }
+        }
+
         return Result.success("规则创建成功", created);
+    }
+
+    /**
+     * 转换 PolicyDTO 为 RulePolicy 实体
+     */
+    private RulePolicy convertPolicyDTO(RuleCreateDTO.PolicyDTO dto, Long ruleId) {
+        RulePolicy policy = new RulePolicy();
+        policy.setRuleId(ruleId);
+        policy.setScope(dto.getScope());
+
+        // 直接设置 List（MyBatis-Plus 会自动使用 JacksonTypeHandler 转换）
+        policy.setWhitelist(dto.getWhitelist());
+        policy.setBlacklist(dto.getBlacklist());
+
+        policy.setRateLimitEnabled(dto.getRateLimitEnabled());
+        policy.setRateLimitMaxRequests(dto.getRateLimitMaxRequests());
+        policy.setRateLimitWindowSeconds(dto.getRateLimitWindowSeconds());
+
+        policy.setTimeWindowEnabled(dto.getTimeWindowEnabled());
+        policy.setTimeWindowStart(dto.getTimeWindowStart() != null
+            ? java.time.LocalTime.parse(dto.getTimeWindowStart()) : null);
+        policy.setTimeWindowEnd(dto.getTimeWindowEnd() != null
+            ? java.time.LocalTime.parse(dto.getTimeWindowEnd()) : null);
+        policy.setTimeWindowWeekdays(dto.getTimeWindowWeekdays());
+
+        policy.setRoleEnabled(dto.getRoleEnabled());
+        policy.setAllowedRoles(dto.getAllowedRoles());
+
+        policy.setCooldownEnabled(dto.getCooldownEnabled());
+        policy.setCooldownSeconds(dto.getCooldownSeconds());
+
+        return policy;
     }
 
     /**
@@ -106,10 +165,10 @@ public class RuleController {
     @Operation(summary = "更新规则", description = "更新现有规则的信息")
     public Result<MessageRule> updateRule(
         @Parameter(description = "规则ID") @PathVariable Long id,
-        @Valid @RequestBody MessageRule rule
+        @Valid @RequestBody RuleUpdateDTO dto
     ) {
         log.info("更新规则: id={}, name={}, matchType={}, pattern={}",
-            id, rule.getName(), rule.getMatchType(), rule.getPattern());
+            id, dto.getRuleName(), dto.getMatchType(), dto.getPattern());
 
         // 检查规则是否存在
         MessageRule existing = ruleService.getRuleById(id);
@@ -117,21 +176,114 @@ public class RuleController {
             return Result.error(ResultCode.RULE_NOT_FOUND);
         }
 
-        // 验证规则名称唯一性（排除自身）
-        if (!existing.getName().equals(rule.getName()) && ruleService.existsByName(rule.getName())) {
-            return Result.error(ResultCode.RULE_NAME_DUPLICATE);
+        // 更新规则字段（只更新提供的字段）
+        if (dto.getRuleName() != null) {
+            // 验证规则名称唯一性（排除自身）
+            if (!existing.getName().equals(dto.getRuleName()) && ruleService.existsByName(dto.getRuleName())) {
+                return Result.error(ResultCode.RULE_NAME_DUPLICATE);
+            }
+            existing.setName(dto.getRuleName());
+        }
+        if (dto.getDescription() != null) {
+            existing.setDescription(dto.getDescription());
+        }
+        if (dto.getMatchType() != null) {
+            // 转换 MatchType 枚举
+            existing.setMatchType(MessageRule.MatchType.valueOf(dto.getMatchType().name()));
+        }
+        if (dto.getPattern() != null) {
+            existing.setPattern(dto.getPattern());
+        }
+        if (dto.getPriority() != null) {
+            existing.setPriority(dto.getPriority());
+        }
+        if (dto.getHandlerConfig() != null) {
+            existing.setHandlerConfig(dto.getHandlerConfig());
+        }
+        if (dto.getEnabled() != null) {
+            existing.setEnabled(dto.getEnabled());
         }
 
         // 验证正则表达式
-        if (MessageRule.MatchType.REGEX.equals(rule.getMatchType())) {
-            if (!ruleService.validateRegexPattern(rule.getPattern())) {
+        if (MessageRule.MatchType.REGEX.equals(existing.getMatchType())) {
+            if (!ruleService.validateRegexPattern(existing.getPattern())) {
                 return Result.error(ResultCode.RULE_PATTERN_INVALID, "正则表达式语法错误");
             }
         }
 
-        rule.setId(id);
-        MessageRule updated = ruleService.updateRule(rule);
+        MessageRule updated = ruleService.updateRule(existing);
+
+        // 更新 policy（如果提供）
+        if (dto.getPolicy() != null) {
+            try {
+                RulePolicy policy = convertUpdatePolicyDTO(dto.getPolicy(), id);
+                policyService.saveOrUpdatePolicy(policy);
+                log.info("Policy updated for rule: ruleId={}", id);
+            } catch (Exception e) {
+                log.error("Failed to update policy for rule: ruleId={}", id, e);
+                // Policy 更新失败不影响规则更新
+            }
+        }
+
         return Result.success("规则更新成功", updated);
+    }
+
+    /**
+     * 转换 RuleUpdateDTO.PolicyDTO 为 RulePolicy 实体（用于更新）
+     */
+    private RulePolicy convertUpdatePolicyDTO(RuleUpdateDTO.PolicyDTO dto, Long ruleId) {
+        // 先获取现有 policy（如果存在）
+        RulePolicy policy = policyService.getPolicyByRuleId(ruleId);
+        if (policy == null) {
+            policy = new RulePolicy();
+            policy.setRuleId(ruleId);
+        }
+
+        // 只更新提供的字段
+        if (dto.getScope() != null) {
+            policy.setScope(dto.getScope());
+        }
+        if (dto.getWhitelist() != null) {
+            policy.setWhitelist(dto.getWhitelist());
+        }
+        if (dto.getBlacklist() != null) {
+            policy.setBlacklist(dto.getBlacklist());
+        }
+        if (dto.getRateLimitEnabled() != null) {
+            policy.setRateLimitEnabled(dto.getRateLimitEnabled());
+        }
+        if (dto.getRateLimitMaxRequests() != null) {
+            policy.setRateLimitMaxRequests(dto.getRateLimitMaxRequests());
+        }
+        if (dto.getRateLimitWindowSeconds() != null) {
+            policy.setRateLimitWindowSeconds(dto.getRateLimitWindowSeconds());
+        }
+        if (dto.getTimeWindowEnabled() != null) {
+            policy.setTimeWindowEnabled(dto.getTimeWindowEnabled());
+        }
+        if (dto.getTimeWindowStart() != null) {
+            policy.setTimeWindowStart(java.time.LocalTime.parse(dto.getTimeWindowStart()));
+        }
+        if (dto.getTimeWindowEnd() != null) {
+            policy.setTimeWindowEnd(java.time.LocalTime.parse(dto.getTimeWindowEnd()));
+        }
+        if (dto.getTimeWindowWeekdays() != null) {
+            policy.setTimeWindowWeekdays(dto.getTimeWindowWeekdays());
+        }
+        if (dto.getRoleEnabled() != null) {
+            policy.setRoleEnabled(dto.getRoleEnabled());
+        }
+        if (dto.getAllowedRoles() != null) {
+            policy.setAllowedRoles(dto.getAllowedRoles());
+        }
+        if (dto.getCooldownEnabled() != null) {
+            policy.setCooldownEnabled(dto.getCooldownEnabled());
+        }
+        if (dto.getCooldownSeconds() != null) {
+            policy.setCooldownSeconds(dto.getCooldownSeconds());
+        }
+
+        return policy;
     }
 
     /**
@@ -259,16 +411,21 @@ public class RuleController {
      */
     @PostMapping("/test-match")
     @Operation(summary = "测试规则匹配", description = "测试规则是否能匹配指定消息")
-    public Result<Boolean> testRuleMatch(
-        @Parameter(description = "匹配类型") @RequestParam MessageRule.MatchType matchType,
-        @Parameter(description = "匹配模式") @RequestParam String pattern,
-        @Parameter(description = "测试消息") @RequestParam String message
-    ) {
+    public Result<TestRuleResult> testRuleMatch(@Valid @RequestBody TestRuleRequest request) {
         log.info("测试规则匹配: matchType={}, pattern={}, message={}",
-            matchType, pattern, message);
+            request.getMatchType(), request.getMatchPattern(), request.getTestMessage());
 
-        boolean matched = ruleService.testRuleMatch(matchType, pattern, message);
-        return Result.success(matched ? "匹配成功" : "未匹配", matched);
+        boolean matched = ruleService.testRuleMatch(
+            request.getMatchType(),
+            request.getMatchPattern(),
+            request.getTestMessage()
+        );
+
+        TestRuleResult result = new TestRuleResult();
+        result.setMatched(matched);
+        result.setMessage(matched ? "✓ 消息匹配成功" : "✗ 消息未匹配");
+
+        return Result.success(result.getMessage(), result);
     }
 
     /**
@@ -683,6 +840,12 @@ public class RuleController {
         private String groupId;
         private String userId;
 
+        // Legacy fields for direct pattern testing (without rule ID)
+        private MessageRule.MatchType matchType;
+        private String matchPattern;  // Legacy field name
+        private String pattern;        // New field name (preferred)
+        private String testMessage;
+
         public Long getRuleId() {
             return ruleId;
         }
@@ -714,6 +877,42 @@ public class RuleController {
         public void setUserId(String userId) {
             this.userId = userId;
         }
+
+        public MessageRule.MatchType getMatchType() {
+            return matchType;
+        }
+
+        public void setMatchType(MessageRule.MatchType matchType) {
+            this.matchType = matchType;
+        }
+
+        /**
+         * Get pattern (supports both 'pattern' and 'matchPattern' field names)
+         */
+        public String getMatchPattern() {
+            // Prefer 'pattern' if set, fallback to 'matchPattern'
+            return pattern != null ? pattern : matchPattern;
+        }
+
+        public void setMatchPattern(String matchPattern) {
+            this.matchPattern = matchPattern;
+        }
+
+        public String getPattern() {
+            return pattern;
+        }
+
+        public void setPattern(String pattern) {
+            this.pattern = pattern;
+        }
+
+        public String getTestMessage() {
+            return testMessage;
+        }
+
+        public void setTestMessage(String testMessage) {
+            this.testMessage = testMessage;
+        }
     }
 
     /**
@@ -721,6 +920,7 @@ public class RuleController {
      */
     public static class TestRuleResult {
         private boolean matched;
+        private String message;
         private String ruleName;
         private String matchType;
         private String pattern;
@@ -734,6 +934,14 @@ public class RuleController {
 
         public void setMatched(boolean matched) {
             this.matched = matched;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = message;
         }
 
         public String getRuleName() {
