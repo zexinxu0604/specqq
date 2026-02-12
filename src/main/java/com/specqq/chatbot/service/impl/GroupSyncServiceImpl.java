@@ -52,10 +52,12 @@ public class GroupSyncServiceImpl implements GroupSyncService {
             // 获取客户端适配器
             ChatClient client = groupChat.getClient();
             if (client == null) {
+                log.debug("客户端信息未加载，从数据库查询: clientId={}", groupChat.getClientId());
                 client = chatClientMapper.selectById(groupChat.getClientId());
                 groupChat.setClient(client);
             }
 
+            log.debug("获取客户端适配器: protocolType={}", client.getProtocolType());
             ClientAdapter adapter = clientAdapterFactory.getAdapter(client.getProtocolType());
             if (!(adapter instanceof NapCatAdapter napCatAdapter)) {
                 throw new IllegalStateException("Only NapCat adapter is supported for sync");
@@ -63,8 +65,12 @@ public class GroupSyncServiceImpl implements GroupSyncService {
 
             // 调用 NapCat API 获取群组信息
             Long groupIdLong = Long.parseLong(groupChat.getGroupId());
+            log.debug("调用NapCat API获取群组信息: groupId={}", groupIdLong);
             CompletableFuture<ApiCallResponseDTO> future = napCatAdapter.getGroupInfo(groupIdLong);
             ApiCallResponseDTO response = future.join();
+            log.debug("NapCat API响应: retcode={}, hasData={}",
+                response != null ? response.getRetcode() : null,
+                response != null && response.getData() != null);
 
             if (response == null || response.getRetcode() != 0) {
                 // API 调用失败或机器人不在群组中
@@ -81,6 +87,7 @@ public class GroupSyncServiceImpl implements GroupSyncService {
             Map<String, Object> data = response.getData();
             String groupName = (String) data.get("group_name");
             Integer memberCount = getIntValue(data, "member_count");
+            log.debug("解析群组信息: groupName={}, memberCount={}", groupName, memberCount);
 
             // 更新群组信息
             if (groupName != null) {
@@ -92,6 +99,7 @@ public class GroupSyncServiceImpl implements GroupSyncService {
 
             // 标记同步成功
             groupChat.markSyncSuccess();
+            log.debug("标记同步成功: groupId={}, lastSyncTime={}", groupChat.getGroupId(), groupChat.getLastSyncTime());
             groupChat.setActive(true);
             groupChatMapper.updateById(groupChat);
 
@@ -124,6 +132,8 @@ public class GroupSyncServiceImpl implements GroupSyncService {
     @Override
     public BatchSyncResultDTO batchSyncGroups(List<GroupChat> groupChats) {
         log.info("开始批量同步群组: count={}", groupChats.size());
+        log.debug("批量同步群组列表: groupIds={}",
+            groupChats.stream().map(GroupChat::getGroupId).collect(Collectors.toList()));
         LocalDateTime startTime = LocalDateTime.now();
 
         List<GroupSyncResultDTO> results = groupChats.stream()
@@ -136,6 +146,9 @@ public class GroupSyncServiceImpl implements GroupSyncService {
         log.info("批量同步完成: total={}, success={}, failure={}, duration={}ms",
                 batchResult.totalCount(), batchResult.successCount(),
                 batchResult.failureCount(), batchResult.durationMs());
+        log.debug("批量同步详细结果: successRate={}%, results={}",
+            String.format("%.2f", batchResult.getSuccessRate()),
+            results.stream().map(r -> String.format("%s:%s", r.groupName(), r.syncStatus())).collect(Collectors.toList()));
 
         return batchResult;
     }
@@ -170,12 +183,14 @@ public class GroupSyncServiceImpl implements GroupSyncService {
             }
 
             // 获取适配器
+            log.debug("获取客户端适配器用于群组发现: protocolType={}", client.getProtocolType());
             ClientAdapter adapter = clientAdapterFactory.getAdapter(client.getProtocolType());
             if (!(adapter instanceof NapCatAdapter napCatAdapter)) {
                 throw new IllegalStateException("Only NapCat adapter is supported for discovery");
             }
 
             // 调用 NapCat API 获取群组列表
+            log.debug("调用NapCat API获取群组列表");
             CompletableFuture<ApiCallResponseDTO> future = napCatAdapter.getGroupList();
             ApiCallResponseDTO response = future.join();
 
@@ -187,6 +202,7 @@ public class GroupSyncServiceImpl implements GroupSyncService {
 
             // 解析群组列表
             List<Map<String, Object>> groupList = (List<Map<String, Object>>) response.getData().get("groups");
+            log.debug("NapCat返回群组列表: totalCount={}", groupList != null ? groupList.size() : 0);
             if (groupList == null || groupList.isEmpty()) {
                 log.info("未发现新群组: clientId={}", clientId);
                 return 0;
@@ -197,6 +213,7 @@ public class GroupSyncServiceImpl implements GroupSyncService {
             List<String> existingGroupIds = existingGroups.stream()
                     .map(GroupChat::getGroupId)
                     .collect(Collectors.toList());
+            log.debug("当前已存在群组数量: {}", existingGroupIds.size());
 
             // 添加新群组
             List<GroupChat> newGroups = new ArrayList<>();
