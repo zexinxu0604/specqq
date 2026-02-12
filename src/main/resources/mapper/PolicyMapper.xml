@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.specqq.chatbot.mapper.PolicyMapper">
+
+    <!-- ResultMap for RulePolicy -->
+    <resultMap id="BaseResultMap" type="com.specqq.chatbot.entity.RulePolicy">
+        <id column="id" property="id" />
+        <result column="rule_id" property="ruleId" />
+        <result column="scope" property="scope" />
+        <result column="whitelist" property="whitelist" typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler" />
+        <result column="blacklist" property="blacklist" typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler" />
+        <result column="rate_limit_enabled" property="rateLimitEnabled" />
+        <result column="rate_limit_max_requests" property="rateLimitMaxRequests" />
+        <result column="rate_limit_window_seconds" property="rateLimitWindowSeconds" />
+        <result column="time_window_enabled" property="timeWindowEnabled" />
+        <result column="time_window_start" property="timeWindowStart" />
+        <result column="time_window_end" property="timeWindowEnd" />
+        <result column="time_window_weekdays" property="timeWindowWeekdays" />
+        <result column="role_enabled" property="roleEnabled" />
+        <result column="allowed_roles" property="allowedRoles" typeHandler="com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler" />
+        <result column="cooldown_enabled" property="cooldownEnabled" />
+        <result column="cooldown_seconds" property="cooldownSeconds" />
+        <result column="create_time" property="createTime" />
+        <result column="update_time" property="updateTime" />
+    </resultMap>
+
+</mapper>

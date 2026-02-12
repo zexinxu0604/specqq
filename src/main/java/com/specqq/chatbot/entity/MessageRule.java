@@ -1,6 +1,7 @@
 package com.specqq.chatbot.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
+import com.specqq.chatbot.common.enums.OnErrorPolicy;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -52,7 +53,19 @@ public class MessageRule {
     private String responseTemplate;
 
     /**
-     * 优先级(0-100, 数字越大优先级越高)
+     * Handler 配置（JSON 格式）
+     */
+    @TableField("handler_config")
+    private String handlerConfig;
+
+    /**
+     * 错误策略: STOP, CONTINUE, LOG_ONLY
+     */
+    @TableField("on_error_policy")
+    private OnErrorPolicy onErrorPolicy;
+
+    /**
+     * 优先级(1-1000, 数字越小优先级越高)
      */
     @TableField("priority")
     private Integer priority;
@@ -64,6 +77,25 @@ public class MessageRule {
     private Boolean enabled;
 
     /**
+     * 逻辑删除标志
+     */
+    @TableLogic
+    @TableField("deleted")
+    private Boolean deleted;
+
+    /**
+     * 创建人
+     */
+    @TableField("create_by")
+    private String createBy;
+
+    /**
+     * 更新人
+     */
+    @TableField("update_by")
+    private String updateBy;
+
+    /**
      * 创建者ID(外键)
      */
     @TableField("created_by")
@@ -73,13 +105,13 @@ public class MessageRule {
      * 创建时间
      */
     @TableField(value = "created_at", fill = FieldFill.INSERT)
-    private LocalDateTime createdAt;
+    private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
     @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
+    private LocalDateTime updateTime;
 
     /**
      * 匹配类型枚举
@@ -99,6 +131,16 @@ public class MessageRule {
          * 正则表达式匹配
          */
         REGEX,
+
+        /**
+         * 前缀匹配
+         */
+        PREFIX,
+
+        /**
+         * 后缀匹配
+         */
+        SUFFIX,
 
         /**
          * 消息统计规则(自动匹配所有消息)
