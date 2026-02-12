@@ -118,11 +118,11 @@ public class RuleUpdateDTO {
         @Schema(description = "是否启用时间窗口", example = "false")
         private Boolean timeWindowEnabled;
 
-        @Pattern(regexp = "^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$", message = "时间格式必须为 HH:mm:ss")
+        @Pattern(regexp = "^$|^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$", message = "时间格式必须为 HH:mm:ss")
         @Schema(description = "时间窗口开始时间", example = "09:00:00")
         private String timeWindowStart;
 
-        @Pattern(regexp = "^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$", message = "时间格式必须为 HH:mm:ss")
+        @Pattern(regexp = "^$|^([01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d$", message = "时间格式必须为 HH:mm:ss")
         @Schema(description = "时间窗口结束时间", example = "18:00:00")
         private String timeWindowEnd;
 
