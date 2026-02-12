@@ -10,9 +10,12 @@ import com.specqq.chatbot.vo.GroupSyncVO;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -29,6 +32,7 @@ import java.util.stream.Collectors;
 @RestController
 @RequestMapping("/api/groups/sync")
 @RequiredArgsConstructor
+@Validated
 @Tag(name = "群组同步管理", description = "群组信息同步相关接口")
 public class GroupSyncController {
 
@@ -49,7 +53,7 @@ public class GroupSyncController {
     @Operation(summary = "重试失败的群组同步", description = "对连续失败次数达到阈值的群组进行重试")
     public Result<BatchSyncVO> retryFailedGroups(
             @Parameter(description = "最小失败次数阈值，默认1")
-            @RequestParam(defaultValue = "1") Integer minFailureCount) {
+            @RequestParam(defaultValue = "1") @Min(value = 1, message = "最小失败次数必须大于等于1") Integer minFailureCount) {
         log.info("手动触发重试失败群组: minFailureCount={}", minFailureCount);
         BatchSyncResultDTO result = groupSyncScheduler.triggerManualRetry(minFailureCount);
         return Result.success(BatchSyncVO.from(result));
@@ -60,7 +64,7 @@ public class GroupSyncController {
     @Operation(summary = "同步单个群组", description = "立即同步指定群组的信息")
     public Result<GroupSyncVO> syncGroup(
             @Parameter(description = "群组ID")
-            @PathVariable Long groupId) {
+            @PathVariable @NotNull(message = "群组ID不能为空") @Min(value = 1, message = "群组ID必须大于0") Long groupId) {
         log.info("手动同步单个群组: groupId={}", groupId);
         // TODO: 需要先查询群组实体
         return Result.error("功能开发中");
@@ -83,7 +87,7 @@ public class GroupSyncController {
     @Operation(summary = "重置群组失败计数", description = "手动重置指定群组的失败计数和失败原因")
     public Result<Void> resetFailureCount(
             @Parameter(description = "群组ID")
-            @PathVariable Long groupId) {
+            @PathVariable @NotNull(message = "群组ID不能为空") @Min(value = 1, message = "群组ID必须大于0") Long groupId) {
         log.info("重置群组失败计数: groupId={}", groupId);
         groupSyncService.resetFailureCount(groupId);
         return Result.success();
@@ -94,7 +98,7 @@ public class GroupSyncController {
     @Operation(summary = "自动发现新群组", description = "从NapCat获取机器人所在的所有群组，添加不存在的群组")
     public Result<Integer> discoverNewGroups(
             @Parameter(description = "客户端ID")
-            @PathVariable Long clientId) {
+            @PathVariable @NotNull(message = "客户端ID不能为空") @Min(value = 1, message = "客户端ID必须大于0") Long clientId) {
         log.info("自动发现新群组: clientId={}", clientId);
         Integer newGroupCount = groupSyncService.discoverNewGroups(clientId);
         return Result.success("成功发现并添加 " + newGroupCount + " 个新群组", newGroupCount);
