@@ -311,28 +311,33 @@ const applyTemplate = (templateName: string) => {
 
 // Convert form model to PolicyDTO
 const getPolicyDTO = (): PolicyDTO => {
+  // Helper: Convert HH:mm to HH:mm:ss format
+  const addSeconds = (time: string) => {
+    if (!time) return time
+    return time.includes(':') && time.split(':').length === 2 ? `${time}:00` : time
+  }
+
+  // Base policy with always-required fields
   const policy: PolicyDTO = {
     scope: formModel.value.scope,
     whitelist: whitelistInput.value.split('\n').filter(s => s.trim()),
     blacklist: blacklistInput.value.split('\n').filter(s => s.trim()),
+
+    // Enabled flags
     rateLimitEnabled: formModel.value.rateLimitEnabled,
-    rateLimitMaxRequests: formModel.value.rateLimitMaxRequests,
-    rateLimitWindowSeconds: formModel.value.rateLimitWindowSeconds,
     timeWindowEnabled: formModel.value.timeWindowEnabled,
     roleEnabled: formModel.value.roleEnabled,
-    allowedRoles: formModel.value.allowedRoles,
-    cooldownEnabled: formModel.value.cooldownEnabled,
-    cooldownSeconds: formModel.value.cooldownSeconds
+    cooldownEnabled: formModel.value.cooldownEnabled
+  }
+
+  // Only include rate limit fields when enabled
+  if (formModel.value.rateLimitEnabled) {
+    policy.rateLimitMaxRequests = formModel.value.rateLimitMaxRequests
+    policy.rateLimitWindowSeconds = formModel.value.rateLimitWindowSeconds
   }
 
   // Only include time window fields when enabled
   if (formModel.value.timeWindowEnabled) {
-    // Convert HH:mm to HH:mm:ss format
-    const addSeconds = (time: string) => {
-      if (!time) return time
-      return time.includes(':') && time.split(':').length === 2 ? `${time}:00` : time
-    }
-
     policy.timeWindowStart = addSeconds(formModel.value.timeWindowStart)
     policy.timeWindowEnd = addSeconds(formModel.value.timeWindowEnd)
 
@@ -342,6 +347,16 @@ const getPolicyDTO = (): PolicyDTO => {
         ? formModel.value.timeWindowWeekdays.join(',')
         : formModel.value.timeWindowWeekdays
     }
+  }
+
+  // Only include role fields when enabled
+  if (formModel.value.roleEnabled) {
+    policy.allowedRoles = formModel.value.allowedRoles
+  }
+
+  // Only include cooldown fields when enabled
+  if (formModel.value.cooldownEnabled) {
+    policy.cooldownSeconds = formModel.value.cooldownSeconds
   }
 
   return policy
