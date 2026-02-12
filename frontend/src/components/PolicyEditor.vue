@@ -222,6 +222,13 @@ const emit = defineEmits<Emits>()
 const formRef = ref()
 const selectedTemplate = ref('')
 
+// Helper: Convert HH:mm:ss to HH:mm
+const removeSeconds = (time: string | undefined) => {
+  if (!time) return '00:00'
+  const parts = time.split(':')
+  return parts.length >= 2 ? `${parts[0]}:${parts[1]}` : time
+}
+
 // Form model
 const formModel = ref<PolicyFormModel>({
   scope: props.modelValue?.scope || Scope.USER,
@@ -231,8 +238,8 @@ const formModel = ref<PolicyFormModel>({
   rateLimitMaxRequests: props.modelValue?.rateLimitMaxRequests || 10,
   rateLimitWindowSeconds: props.modelValue?.rateLimitWindowSeconds || 60,
   timeWindowEnabled: props.modelValue?.timeWindowEnabled || false,
-  timeWindowStart: props.modelValue?.timeWindowStart || '00:00',
-  timeWindowEnd: props.modelValue?.timeWindowEnd || '23:59',
+  timeWindowStart: removeSeconds(props.modelValue?.timeWindowStart) || '00:00',
+  timeWindowEnd: removeSeconds(props.modelValue?.timeWindowEnd) || '23:59',
   timeWindowWeekdays: typeof props.modelValue?.timeWindowWeekdays === 'string'
     ? props.modelValue.timeWindowWeekdays.split(',').map(Number)
     : (props.modelValue?.timeWindowWeekdays || [1, 2, 3, 4, 5, 6, 7]),
@@ -288,8 +295,8 @@ const applyTemplate = (templateName: string) => {
     rateLimitMaxRequests: template.policy.rateLimitMaxRequests || 10,
     rateLimitWindowSeconds: template.policy.rateLimitWindowSeconds || 60,
     timeWindowEnabled: template.policy.timeWindowEnabled || false,
-    timeWindowStart: template.policy.timeWindowStart || '00:00',
-    timeWindowEnd: template.policy.timeWindowEnd || '23:59',
+    timeWindowStart: removeSeconds(template.policy.timeWindowStart) || '00:00',
+    timeWindowEnd: removeSeconds(template.policy.timeWindowEnd) || '23:59',
     timeWindowWeekdays: typeof template.policy.timeWindowWeekdays === 'string'
       ? template.policy.timeWindowWeekdays.split(',').map(Number)
       : (template.policy.timeWindowWeekdays || [1, 2, 3, 4, 5, 6, 7]),
@@ -304,18 +311,6 @@ const applyTemplate = (templateName: string) => {
 
 // Convert form model to PolicyDTO
 const getPolicyDTO = (): PolicyDTO => {
-  // Convert timeWindowWeekdays array to string
-  let timeWindowWeekdays: string | undefined
-  if (formModel.value.timeWindowEnabled && formModel.value.timeWindowWeekdays) {
-    timeWindowWeekdays = Array.isArray(formModel.value.timeWindowWeekdays)
-      ? formModel.value.timeWindowWeekdays.join(',')
-      : formModel.value.timeWindowWeekdays
-    // Don't send empty string
-    if (timeWindowWeekdays === '') {
-      timeWindowWeekdays = undefined
-    }
-  }
-
   const policy: PolicyDTO = {
     scope: formModel.value.scope,
     whitelist: whitelistInput.value.split('\n').filter(s => s.trim()),
@@ -324,17 +319,29 @@ const getPolicyDTO = (): PolicyDTO => {
     rateLimitMaxRequests: formModel.value.rateLimitMaxRequests,
     rateLimitWindowSeconds: formModel.value.rateLimitWindowSeconds,
     timeWindowEnabled: formModel.value.timeWindowEnabled,
-    timeWindowStart: formModel.value.timeWindowStart,
-    timeWindowEnd: formModel.value.timeWindowEnd,
     roleEnabled: formModel.value.roleEnabled,
     allowedRoles: formModel.value.allowedRoles,
     cooldownEnabled: formModel.value.cooldownEnabled,
     cooldownSeconds: formModel.value.cooldownSeconds
   }
 
-  // Only include timeWindowWeekdays if it has a value
-  if (timeWindowWeekdays !== undefined) {
-    policy.timeWindowWeekdays = timeWindowWeekdays
+  // Only include time window fields when enabled
+  if (formModel.value.timeWindowEnabled) {
+    // Convert HH:mm to HH:mm:ss format
+    const addSeconds = (time: string) => {
+      if (!time) return time
+      return time.includes(':') && time.split(':').length === 2 ? `${time}:00` : time
+    }
+
+    policy.timeWindowStart = addSeconds(formModel.value.timeWindowStart)
+    policy.timeWindowEnd = addSeconds(formModel.value.timeWindowEnd)
+
+    // Convert timeWindowWeekdays array to string
+    if (formModel.value.timeWindowWeekdays && formModel.value.timeWindowWeekdays.length > 0) {
+      policy.timeWindowWeekdays = Array.isArray(formModel.value.timeWindowWeekdays)
+        ? formModel.value.timeWindowWeekdays.join(',')
+        : formModel.value.timeWindowWeekdays
+    }
   }
 
   return policy
