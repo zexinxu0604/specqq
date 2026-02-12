@@ -40,20 +40,44 @@ public abstract class BaseHandler implements MessageHandler {
     /**
      * 提取参数
      *
-     * <p>子类可重写此方法，将 JSON 字符串解析为特定的参数对象</p>
+     * <p>从 handlerConfig JSON 中提取 params 字段，然后解析为特定的参数对象</p>
+     * <p>Expected handlerConfig format: {"handlerType": "...", "params": {...}}</p>
      *
-     * @param paramsJson 参数 JSON 字符串
+     * @param handlerConfigJson 完整的 handler 配置 JSON 字符串
      * @return 解析后的参数对象
      */
-    protected Object extractParams(String paramsJson) {
-        if (paramsJson == null || paramsJson.isEmpty()) {
+    protected Object extractParams(String handlerConfigJson) {
+        if (handlerConfigJson == null || handlerConfigJson.isEmpty()) {
             return null;
         }
+
         try {
-            return objectMapper.readValue(paramsJson, getParamClass());
+            // Parse the handlerConfig JSON to extract the "params" field
+            com.fasterxml.jackson.databind.JsonNode configNode = objectMapper.readTree(handlerConfigJson);
+
+            // Check if "params" field exists
+            if (!configNode.has("params")) {
+                log.debug("No 'params' field in handlerConfig, using empty params");
+                return null;
+            }
+
+            // Extract the "params" field
+            com.fasterxml.jackson.databind.JsonNode paramsNode = configNode.get("params");
+
+            // Convert params node to the target class
+            Class<?> paramClass = getParamClass();
+            if (paramClass == Object.class) {
+                // If no specific param class, return the params as a Map
+                return objectMapper.treeToValue(paramsNode, java.util.Map.class);
+            } else {
+                // Parse to specific param class
+                return objectMapper.treeToValue(paramsNode, paramClass);
+            }
+
         } catch (Exception e) {
-            log.warn("参数解析失败，使用原始字符串: params={}", paramsJson);
-            return paramsJson;
+            log.warn("参数解析失败，使用默认参数: handlerConfig={}, error={}",
+                    handlerConfigJson, e.getMessage());
+            return null;
         }
     }
 
