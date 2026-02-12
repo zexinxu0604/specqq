@@ -202,10 +202,10 @@ This project uses **Web application** structure:
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T081 [P] Add comprehensive Javadoc to all public methods and classes
-- [ ] T082 [P] Add SLF4J debug logging for troubleshooting in all services
-- [ ] T083 [P] Configure Prometheus metrics for sync operations in src/main/resources/application.yml
-- [ ] T084 [P] Add health check indicator for sync task status in src/main/java/com/specqq/chatbot/health/SyncHealthIndicator.java
+- [x] T081 [P] Add comprehensive Javadoc to all public methods and classes
+- [x] T082 [P] Add SLF4J debug logging for troubleshooting in all services
+- [x] T083 [P] Configure Prometheus metrics for sync operations in src/main/resources/application.yml
+- [x] T084 [P] Add health check indicator for sync task status in src/main/java/com/specqq/chatbot/health/SyncHealthIndicator.java
 - [ ] T085 [P] Create NapCat mock server script in tools/napcat-mock/server.js (from quickstart.md)
 - [ ] T086 [P] Add frontend unit tests for GroupSyncStatus component in frontend/tests/unit/GroupSyncStatus.spec.ts
 - [ ] T087 Code cleanup: Extract magic numbers to constants
