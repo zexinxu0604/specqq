@@ -94,8 +94,10 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(Arrays.asList(
             "http://localhost:3000",  // Vue开发服务器
             "http://localhost:5173",  // Vite开发服务器
+            "http://localhost:5174",  // Vite开发服务器 (备用端口)
             "http://127.0.0.1:3000",
-            "http://127.0.0.1:5173"
+            "http://127.0.0.1:5173",
+            "http://127.0.0.1:5174"
         ));
 
         // 允许的HTTP方法

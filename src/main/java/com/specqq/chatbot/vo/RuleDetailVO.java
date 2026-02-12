@@ -63,6 +63,12 @@ public class RuleDetailVO {
     private Integer priority;
 
     /**
+     * 回复模板
+     */
+    @Schema(description = "回复模板", example = "你好，{user}！")
+    private String responseTemplate;
+
+    /**
      * Handler 配置
      */
     @Schema(description = "Handler 配置 (JSON 格式)", example = "{\"handlerType\":\"TEXT_REPLY\",\"params\":{\"content\":\"你好呀！\"}}")

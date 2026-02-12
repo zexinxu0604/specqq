@@ -639,6 +639,7 @@ public class RuleController {
                 .matchType(matchType)
                 .pattern(rule.getPattern())
                 .priority(rule.getPriority())
+                .responseTemplate(rule.getResponseTemplate())
                 .handlerConfig(rule.getHandlerConfig())
                 .onErrorPolicy(rule.getOnErrorPolicy())
                 .enabled(rule.getEnabled())
