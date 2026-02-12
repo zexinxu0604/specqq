@@ -197,6 +197,9 @@ public class RuleController {
         if (dto.getPriority() != null) {
             existing.setPriority(dto.getPriority());
         }
+        if (dto.getResponseTemplate() != null) {
+            existing.setResponseTemplate(dto.getResponseTemplate());
+        }
         if (dto.getHandlerConfig() != null) {
             existing.setHandlerConfig(dto.getHandlerConfig());
         }

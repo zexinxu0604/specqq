@@ -55,6 +55,13 @@ public class RuleUpdateDTO {
     private Integer priority;
 
     /**
+     * 回复模板
+     */
+    @Size(max = 500, message = "回复模板长度不能超过500个字符")
+    @Schema(description = "回复模板", example = "你好，{user}！")
+    private String responseTemplate;
+
+    /**
      * Handler 配置 (JSON 字符串)
      */
     @Schema(description = "Handler 配置 (JSON 格式)", example = "{\"handlerType\":\"TEXT_REPLY\",\"params\":{\"content\":\"你好呀！\"}}")
