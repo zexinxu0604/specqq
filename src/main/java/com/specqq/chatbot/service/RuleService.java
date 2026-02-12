@@ -1,6 +1,7 @@
 package com.specqq.chatbot.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -106,8 +107,26 @@ public class RuleService extends ServiceImpl<MessageRuleMapper, MessageRule> {
             }
         }
 
-        messageRuleMapper.updateById(rule);
-        log.info("Updated rule: id={}, name={}", rule.getId(), rule.getName());
+        // 使用 UpdateWrapper 来支持将字段更新为 null
+        // 特别是 handlerConfig 字段，当用户取消选择 handler 时需要设置为 null
+        LambdaUpdateWrapper<MessageRule> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(MessageRule::getId, rule.getId());
+
+        // 设置所有需要更新的字段（包括可能为 null 的字段）
+        updateWrapper
+            .set(MessageRule::getName, rule.getName())
+            .set(MessageRule::getDescription, rule.getDescription())
+            .set(MessageRule::getMatchType, rule.getMatchType())
+            .set(MessageRule::getPattern, rule.getPattern())
+            .set(MessageRule::getResponseTemplate, rule.getResponseTemplate())
+            .set(MessageRule::getHandlerConfig, rule.getHandlerConfig())  // 支持 null
+            .set(MessageRule::getOnErrorPolicy, rule.getOnErrorPolicy())
+            .set(MessageRule::getPriority, rule.getPriority())
+            .set(MessageRule::getEnabled, rule.getEnabled());
+
+        messageRuleMapper.update(null, updateWrapper);
+        log.info("Updated rule: id={}, name={}, handlerConfig={}", rule.getId(), rule.getName(),
+                 rule.getHandlerConfig() == null ? "NULL" : "SET");
         return rule;
     }
 

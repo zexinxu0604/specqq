@@ -1,33 +1,44 @@
 <template>
   <div class="handler-selector">
     <!-- Handler Type Selection -->
-    <el-select
-      v-model="selectedHandlerType"
-      placeholder="选择处理器类型（可选）"
-      clearable
-      filterable
-      style="width: 100%"
-      @change="handleHandlerTypeChange"
-    >
-      <el-option-group
-        v-for="category in handlersByCategory"
-        :key="category.category"
-        :label="HandlerCategoryLabels[category.category] || category.category"
+    <div style="display: flex; gap: 8px; align-items: flex-start;">
+      <el-select
+        v-model="selectedHandlerType"
+        placeholder="选择处理器类型（可选）"
+        clearable
+        filterable
+        style="flex: 1;"
+        @change="handleHandlerTypeChange"
       >
-        <el-option
-          v-for="handler in category.handlers"
-          :key="handler.handlerType"
-          :label="handler.name"
-          :value="handler.handlerType"
-          :disabled="!handler.enabled"
+        <el-option-group
+          v-for="category in handlersByCategory"
+          :key="category.category"
+          :label="HandlerCategoryLabels[category.category] || category.category"
         >
-          <span>{{ handler.name }}</span>
-          <span style="float: right; color: var(--el-text-color-secondary); font-size: 12px">
-            {{ handler.handlerType }}
-          </span>
-        </el-option>
-      </el-option-group>
-    </el-select>
+          <el-option
+            v-for="handler in category.handlers"
+            :key="handler.handlerType"
+            :label="handler.name"
+            :value="handler.handlerType"
+            :disabled="!handler.enabled"
+          >
+            <span>{{ handler.name }}</span>
+            <span style="float: right; color: var(--el-text-color-secondary); font-size: 12px">
+              {{ handler.handlerType }}
+            </span>
+          </el-option>
+        </el-option-group>
+      </el-select>
+
+      <el-button
+        v-if="selectedHandlerType"
+        type="info"
+        plain
+        @click="clearHandler"
+      >
+        取消选择
+      </el-button>
+    </div>
 
     <div v-if="selectedHandlerType" class="handler-info">
       <el-text size="small" type="info">
@@ -197,6 +208,11 @@ const handleHandlerTypeChange = (handlerType: string | undefined) => {
     handlerParamsModel.value = {}
     emit('update:handlerParams', {})
   }
+}
+
+// Clear handler selection
+const clearHandler = () => {
+  handleHandlerTypeChange(undefined)
 }
 
 // Watch parameter changes

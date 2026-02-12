@@ -248,6 +248,23 @@ watch(formData, (newVal) => {
   emit('update:modelValue', newVal)
 }, { deep: true })
 
+// 监听 props.modelValue 变化，同步到 formData
+watch(() => props.modelValue, (newVal) => {
+  if (newVal) {
+    Object.assign(formData, {
+      name: newVal.name || '',
+      matchType: newVal.matchType || MatchType.CONTAINS,
+      pattern: newVal.pattern || '',
+      responseTemplate: newVal.responseTemplate || '',
+      priority: newVal.priority ?? 50,
+      description: newVal.description || '',
+      policy: newVal.policy || DEFAULT_POLICY,
+      handlerType: newVal.handlerType,
+      handlerParams: newVal.handlerParams || {}
+    })
+  }
+}, { deep: true })
+
 // CQ Code Pattern Selection
 const selectedCQCodePattern = ref<string | null>(null)
 const selectedCQCodePatternObject = ref<CQCodePattern | null>(null)

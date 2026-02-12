@@ -438,16 +438,27 @@ const handleSubmit = async () => {
     const formData = ruleFormRef.value?.getFormData ? ruleFormRef.value.getFormData() : currentRule.value
     const submitData: any = { ...formData }
 
-    // 如果有 handlerType，构建 handlerConfig JSON
+    console.log('提交前的 formData:', formData)
+    console.log('handlerType:', submitData.handlerType)
+    console.log('handlerParams:', submitData.handlerParams)
+
+    // 处理 handlerConfig
     if (submitData.handlerType) {
+      // 如果有 handlerType，构建 handlerConfig JSON
       submitData.handlerConfig = JSON.stringify({
         handlerType: submitData.handlerType,
         params: submitData.handlerParams || {}
       })
-      // 删除前端专用字段
-      delete submitData.handlerType
-      delete submitData.handlerParams
+      console.log('设置 handlerConfig (有handler):', submitData.handlerConfig)
+    } else {
+      // 如果没有 handlerType（用户取消选择），发送空字符串清除后端配置
+      submitData.handlerConfig = ''
+      console.log('设置 handlerConfig (无handler，空字符串)')
     }
+
+    // 删除前端专用字段
+    delete submitData.handlerType
+    delete submitData.handlerParams
 
     if (isEdit.value) {
       if (!currentRuleId.value) {
