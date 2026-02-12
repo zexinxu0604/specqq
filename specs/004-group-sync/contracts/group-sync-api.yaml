@@ -1,0 +1,694 @@
+openapi: 3.0.3
+info:
+  title: Group Chat Auto-Sync & Rule Management API
+  description: |
+    API specification for automated group chat synchronization and default rule management.
+
+    This API provides endpoints for:
+    - Manual triggering of full group synchronization
+    - Querying group synchronization status
+    - Managing default rule configurations for new groups
+    - Viewing synchronization history and statistics
+
+    **Base URL**: `http://localhost:8080/api`
+
+    **Authentication**: JWT Bearer token required (obtained via `/api/auth/login`)
+
+    **Feature Branch**: `004-group-sync`
+  version: 1.0.0
+  contact:
+    name: SpecQQ Team
+    email: admin@example.com
+
+servers:
+  - url: http://localhost:8080/api
+    description: Development server
+  - url: https://api.specqq.com/api
+    description: Production server
+
+tags:
+  - name: Group Sync
+    description: Group synchronization operations
+  - name: System Config
+    description: System configuration management
+
+paths:
+  /groups/sync:
+    post:
+      tags:
+        - Group Sync
+      summary: Trigger manual group synchronization
+      description: |
+        Manually triggers a full synchronization of all active group information from NapCat API.
+
+        **Behavior**:
+        - Rejects request if a sync task is already running
+        - Executes asynchronously and returns immediately
+        - Updates group information (name, member count, status)
+        - Marks inactive groups (bot removed/group disbanded)
+
+        **Performance**: Processes up to 100 groups in ~2 minutes
+      operationId: triggerGroupSync
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: Optional sync configuration
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GroupSyncRequest'
+      responses:
+        '202':
+          description: Sync task accepted and started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                code: 200
+                message: "同步任务已启动"
+                data:
+                  taskId: "sync-20260212-103000"
+                  startTime: "2026-02-12T10:30:00"
+                  estimatedDuration: "2 minutes"
+                timestamp: "2026-02-12T10:30:00"
+        '409':
+          description: Sync task already running
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                code: 409
+                message: "同步任务正在运行中，请稍后再试"
+                data: null
+                timestamp: "2026-02-12T10:30:00"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /groups/{id}/sync-status:
+    get:
+      tags:
+        - Group Sync
+      summary: Get group synchronization status
+      description: |
+        Retrieves the current synchronization status for a specific group.
+
+        **Includes**:
+        - Last successful sync time
+        - Current sync status (SUCCESS/FAILED)
+        - Failure details (if applicable)
+        - Consecutive failure count
+      operationId: getGroupSyncStatus
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          description: Group ID (internal database ID)
+          required: true
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      responses:
+        '200':
+          description: Sync status retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/GroupSyncStatus'
+              example:
+                code: 200
+                message: "查询成功"
+                data:
+                  groupId: 1
+                  groupName: "测试群组"
+                  lastSyncTime: "2026-02-12T10:30:00"
+                  syncStatus: "SUCCESS"
+                  active: true
+                  lastFailureTime: null
+                  failureReason: null
+                  consecutiveFailureCount: 0
+                timestamp: "2026-02-12T10:35:00"
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /groups/sync-history:
+    get:
+      tags:
+        - Group Sync
+      summary: Get synchronization history
+      description: |
+        Retrieves paginated synchronization history records.
+
+        **Filters**:
+        - Status (SUCCESS/FAILED)
+        - Date range
+        - Group ID
+
+        **Sorting**: By sync time (descending)
+      operationId: getSyncHistory
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: pageNum
+          in: query
+          description: Page number (1-indexed)
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: pageSize
+          in: query
+          description: Records per page
+          required: false
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: status
+          in: query
+          description: Filter by sync status
+          required: false
+          schema:
+            type: string
+            enum: [SUCCESS, FAILED]
+        - name: groupId
+          in: query
+          description: Filter by group ID
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: startTime
+          in: query
+          description: Filter by start time (ISO 8601)
+          required: false
+          schema:
+            type: string
+            format: date-time
+            example: "2026-02-01T00:00:00"
+        - name: endTime
+          in: query
+          description: Filter by end time (ISO 8601)
+          required: false
+          schema:
+            type: string
+            format: date-time
+            example: "2026-02-12T23:59:59"
+      responses:
+        '200':
+          description: History retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/PaginatedSyncHistory'
+              example:
+                code: 200
+                message: "查询成功"
+                data:
+                  total: 150
+                  pageNum: 1
+                  pageSize: 20
+                  records:
+                    - groupId: 1
+                      groupName: "测试群组"
+                      syncTime: "2026-02-12T10:30:00"
+                      syncStatus: "SUCCESS"
+                      duration: 1200
+                    - groupId: 2
+                      groupName: "失败群组"
+                      syncTime: "2026-02-12T10:00:00"
+                      syncStatus: "FAILED"
+                      failureReason: "API timeout after 10 seconds"
+                      duration: 10000
+                timestamp: "2026-02-12T10:35:00"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /groups/sync-statistics:
+    get:
+      tags:
+        - Group Sync
+      summary: Get synchronization statistics
+      description: |
+        Retrieves overall synchronization statistics and metrics.
+
+        **Metrics**:
+        - Total groups
+        - Active groups
+        - Success rate
+        - Average sync duration
+        - Failed groups count
+      operationId: getSyncStatistics
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Statistics retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/SyncStatistics'
+              example:
+                code: 200
+                message: "查询成功"
+                data:
+                  totalGroups: 100
+                  activeGroups: 95
+                  successRate: 98.5
+                  avgSyncDuration: 1500
+                  failedGroupsCount: 2
+                  lastSyncTime: "2026-02-12T10:30:00"
+                timestamp: "2026-02-12T10:35:00"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /config/default-rules:
+    get:
+      tags:
+        - System Config
+      summary: Get default rule configuration
+      description: |
+        Retrieves the current default rule configuration for new groups.
+
+        **Returns**:
+        - List of rule IDs that are enabled by default
+        - Rule details (name, description, priority)
+      operationId: getDefaultRuleConfig
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Configuration retrieved successfully
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/ApiResponse'
+                  - type: object
+                    properties:
+                      data:
+                        $ref: '#/components/schemas/DefaultRuleConfig'
+              example:
+                code: 200
+                message: "查询成功"
+                data:
+                  ruleIds: [1, 3, 5]
+                  rules:
+                    - id: 1
+                      name: "欢迎新成员"
+                      description: "自动欢迎新加入的群成员"
+                      priority: 100
+                    - id: 3
+                      name: "关键词回复"
+                      description: "匹配特定关键词并回复"
+                      priority: 50
+                    - id: 5
+                      name: "帮助指令"
+                      description: "响应帮助命令"
+                      priority: 80
+                  lastUpdated: "2026-02-10T15:00:00"
+                timestamp: "2026-02-12T10:35:00"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      tags:
+        - System Config
+      summary: Update default rule configuration
+      description: |
+        Updates the default rule configuration for new groups.
+
+        **Behavior**:
+        - Validates that all rule IDs exist
+        - Does not affect existing groups (only applies to new groups)
+        - Clears cache after update
+        - Records audit log
+      operationId: updateDefaultRuleConfig
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: New default rule configuration
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDefaultRuleConfigRequest'
+      responses:
+        '200':
+          description: Configuration updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                code: 200
+                message: "配置更新成功"
+                data:
+                  ruleIds: [1, 3, 5, 7]
+                  updatedAt: "2026-02-12T10:40:00"
+                timestamp: "2026-02-12T10:40:00"
+        '400':
+          description: Invalid rule IDs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiResponse'
+              example:
+                code: 400
+                message: "规则ID无效: [999]"
+                data: null
+                timestamp: "2026-02-12T10:40:00"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from `/api/auth/login`
+
+  schemas:
+    ApiResponse:
+      type: object
+      description: Standard API response wrapper
+      required:
+        - code
+        - message
+        - timestamp
+      properties:
+        code:
+          type: integer
+          description: Response code (200 for success, others for errors)
+          example: 200
+        message:
+          type: string
+          description: Response message
+          example: "操作成功"
+        data:
+          type: object
+          description: Response data (null if no data)
+          nullable: true
+        timestamp:
+          type: string
+          format: date-time
+          description: Response timestamp (ISO 8601)
+          example: "2026-02-12T10:30:00"
+
+    GroupSyncRequest:
+      type: object
+      description: Optional parameters for manual sync
+      properties:
+        forceSync:
+          type: boolean
+          description: Force sync even if recently synced
+          default: false
+        groupIds:
+          type: array
+          description: Specific group IDs to sync (empty = all groups)
+          items:
+            type: integer
+            format: int64
+          example: [1, 2, 3]
+
+    GroupSyncStatus:
+      type: object
+      description: Group synchronization status details
+      required:
+        - groupId
+        - groupName
+        - syncStatus
+        - active
+      properties:
+        groupId:
+          type: integer
+          format: int64
+          description: Group ID (internal database ID)
+          example: 1
+        groupName:
+          type: string
+          description: Group name
+          example: "测试群组"
+        lastSyncTime:
+          type: string
+          format: date-time
+          description: Last successful sync time (ISO 8601)
+          nullable: true
+          example: "2026-02-12T10:30:00"
+        syncStatus:
+          type: string
+          enum: [SUCCESS, FAILED]
+          description: Current sync status
+          example: "SUCCESS"
+        active:
+          type: boolean
+          description: Whether bot is still in the group
+          example: true
+        lastFailureTime:
+          type: string
+          format: date-time
+          description: Last failure time (ISO 8601)
+          nullable: true
+          example: null
+        failureReason:
+          type: string
+          description: Failure reason (if status is FAILED)
+          nullable: true
+          maxLength: 500
+          example: null
+        consecutiveFailureCount:
+          type: integer
+          description: Consecutive failure count
+          minimum: 0
+          example: 0
+
+    SyncHistoryRecord:
+      type: object
+      description: Single synchronization history record
+      required:
+        - groupId
+        - groupName
+        - syncTime
+        - syncStatus
+      properties:
+        groupId:
+          type: integer
+          format: int64
+          example: 1
+        groupName:
+          type: string
+          example: "测试群组"
+        syncTime:
+          type: string
+          format: date-time
+          description: Sync execution time
+          example: "2026-02-12T10:30:00"
+        syncStatus:
+          type: string
+          enum: [SUCCESS, FAILED]
+          example: "SUCCESS"
+        duration:
+          type: integer
+          description: Sync duration in milliseconds
+          example: 1200
+        failureReason:
+          type: string
+          description: Failure reason (if status is FAILED)
+          nullable: true
+          example: null
+
+    PaginatedSyncHistory:
+      type: object
+      description: Paginated synchronization history
+      required:
+        - total
+        - pageNum
+        - pageSize
+        - records
+      properties:
+        total:
+          type: integer
+          description: Total number of records
+          example: 150
+        pageNum:
+          type: integer
+          description: Current page number
+          example: 1
+        pageSize:
+          type: integer
+          description: Records per page
+          example: 20
+        records:
+          type: array
+          description: History records
+          items:
+            $ref: '#/components/schemas/SyncHistoryRecord'
+
+    SyncStatistics:
+      type: object
+      description: Overall synchronization statistics
+      required:
+        - totalGroups
+        - activeGroups
+        - successRate
+        - avgSyncDuration
+        - failedGroupsCount
+      properties:
+        totalGroups:
+          type: integer
+          description: Total number of groups
+          example: 100
+        activeGroups:
+          type: integer
+          description: Number of active groups
+          example: 95
+        successRate:
+          type: number
+          format: double
+          description: Success rate percentage
+          minimum: 0
+          maximum: 100
+          example: 98.5
+        avgSyncDuration:
+          type: integer
+          description: Average sync duration in milliseconds
+          example: 1500
+        failedGroupsCount:
+          type: integer
+          description: Number of currently failed groups
+          example: 2
+        lastSyncTime:
+          type: string
+          format: date-time
+          description: Last sync execution time
+          nullable: true
+          example: "2026-02-12T10:30:00"
+
+    DefaultRuleConfig:
+      type: object
+      description: Default rule configuration for new groups
+      required:
+        - ruleIds
+        - rules
+      properties:
+        ruleIds:
+          type: array
+          description: List of default rule IDs
+          items:
+            type: integer
+            format: int64
+          example: [1, 3, 5]
+        rules:
+          type: array
+          description: Detailed rule information
+          items:
+            $ref: '#/components/schemas/RuleInfo'
+        lastUpdated:
+          type: string
+          format: date-time
+          description: Last update time
+          nullable: true
+          example: "2026-02-10T15:00:00"
+
+    RuleInfo:
+      type: object
+      description: Rule information summary
+      required:
+        - id
+        - name
+        - priority
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        name:
+          type: string
+          example: "欢迎新成员"
+        description:
+          type: string
+          nullable: true
+          example: "自动欢迎新加入的群成员"
+        priority:
+          type: integer
+          description: Rule priority (0-100)
+          minimum: 0
+          maximum: 100
+          example: 100
+
+    UpdateDefaultRuleConfigRequest:
+      type: object
+      description: Request to update default rule configuration
+      required:
+        - ruleIds
+      properties:
+        ruleIds:
+          type: array
+          description: New list of default rule IDs (empty array = no default rules)
+          items:
+            type: integer
+            format: int64
+          example: [1, 3, 5, 7]
+
+  responses:
+    Unauthorized:
+      description: Unauthorized - Invalid or missing JWT token
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 401
+            message: "未授权，请先登录"
+            data: null
+            timestamp: "2026-02-12T10:30:00"
+
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 404
+            message: "资源不存在"
+            data: null
+            timestamp: "2026-02-12T10:30:00"
+
+    InternalServerError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiResponse'
+          example:
+            code: 500
+            message: "服务器内部错误"
+            data: null
+            timestamp: "2026-02-12T10:30:00"
