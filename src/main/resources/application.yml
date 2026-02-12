@@ -5,6 +5,11 @@ spring:
     active: dev
   main:
     allow-circular-references: true
+  task:
+    scheduling:
+      pool:
+        size: 5
+      thread-name-prefix: scheduler-
 
 server:
   port: 8080
@@ -41,14 +46,6 @@ caffeine:
     group-sync:
       expire-after-write: 60s   # 1 minute
       maximum-size: 1000
-
-# Spring Scheduler Configuration
-spring:
-  task:
-    scheduling:
-      pool:
-        size: 5
-      thread-name-prefix: scheduler-
 
 # Resilience4j Retry Configuration
 resilience4j:
