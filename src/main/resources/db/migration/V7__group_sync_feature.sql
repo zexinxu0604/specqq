@@ -18,8 +18,8 @@ ADD COLUMN `consecutive_failure_count` INT DEFAULT 0 COMMENT '连续失败次数
 ADD COLUMN `active` BOOLEAN NOT NULL DEFAULT TRUE COMMENT '机器人是否在群中';
 
 -- 创建索引
-CREATE INDEX IF NOT EXISTS `idx_sync_status` ON `group_chat` (`sync_status`, `active`);
-CREATE INDEX IF NOT EXISTS `idx_last_sync_time` ON `group_chat` (`last_sync_time`);
+CREATE INDEX `idx_sync_status` ON `group_chat` (`sync_status`, `active`);
+CREATE INDEX `idx_last_sync_time` ON `group_chat` (`last_sync_time`);
 
 -- ============================================================
 -- 2. 创建 system_config 表
