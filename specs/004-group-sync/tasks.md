@@ -3,6 +3,8 @@
 **Input**: Design documents from `/specs/004-group-sync/`
 **Prerequisites**: plan.md, spec.md, data-model.md, contracts/group-sync-api.yaml, quickstart.md
 
+**Progress**: 11/92 tasks complete (11.96%)
+
 **Tests**: This feature follows TDD (Test-Driven Development) as required by project constitution. All tests must be written FIRST and FAIL before implementation.
 
 **Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
@@ -206,14 +208,14 @@ This project uses **Web application** structure:
 - [x] T082 [P] Add SLF4J debug logging for troubleshooting in all services
 - [x] T083 [P] Configure Prometheus metrics for sync operations in src/main/resources/application.yml
 - [x] T084 [P] Add health check indicator for sync task status in src/main/java/com/specqq/chatbot/health/SyncHealthIndicator.java
-- [ ] T085 [P] Create NapCat mock server script in tools/napcat-mock/server.js (from quickstart.md)
-- [ ] T086 [P] Add frontend unit tests for GroupSyncStatus component in frontend/tests/unit/GroupSyncStatus.spec.ts
-- [ ] T087 Code cleanup: Extract magic numbers to constants
-- [ ] T088 Code cleanup: Simplify complex methods (cyclomatic complexity ≤ 10)
-- [ ] T089 Performance optimization: Add database indexes for sync queries
-- [ ] T090 Security: Validate all API inputs with @Valid and custom validators
+- [x] T085 [P] Create NapCat mock server script in tools/napcat-mock/server.js (from quickstart.md)
+- [x] T086 [P] Add frontend unit tests for GroupSyncStatus component in frontend/tests/unit/GroupSyncStatus.spec.ts
+- [x] T087 Code cleanup: Extract magic numbers to constants
+- [x] T088 Code cleanup: Simplify complex methods (cyclomatic complexity ≤ 10)
+- [x] T089 Performance optimization: Add database indexes for sync queries
+- [x] T090 Security: Validate all API inputs with @Valid and custom validators
 - [ ] T091 Run quickstart.md validation: Execute all test scenarios
-- [ ] T092 Update CLAUDE.md with feature documentation
+- [x] T092 Update CLAUDE.md with feature documentation
 
 ---
 
