@@ -17,6 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,13 +35,24 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class GroupService extends ServiceImpl<GroupChatMapper, GroupChat> {
 
     private final GroupChatMapper groupChatMapper;
     private final GroupRuleConfigMapper groupRuleConfigMapper;
     private final MessageLogMapper messageLogMapper;
     private final NapCatAdapter napCatAdapter;
+
+    // Constructor with @Lazy to break circular dependency
+    public GroupService(
+            GroupChatMapper groupChatMapper,
+            GroupRuleConfigMapper groupRuleConfigMapper,
+            MessageLogMapper messageLogMapper,
+            @Lazy NapCatAdapter napCatAdapter) {
+        this.groupChatMapper = groupChatMapper;
+        this.groupRuleConfigMapper = groupRuleConfigMapper;
+        this.messageLogMapper = messageLogMapper;
+        this.napCatAdapter = napCatAdapter;
+    }
 
     /**
      * 根据群聊平台ID查询群聊

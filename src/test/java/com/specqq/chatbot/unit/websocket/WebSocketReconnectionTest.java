@@ -40,7 +40,10 @@ class WebSocketReconnectionTest {
     private ClientAdapter clientAdapter;
 
     @Mock
-    private MessageRouter messageRouter;
+    private com.specqq.chatbot.service.MessageRouterService messageRouterService;
+
+    @Mock
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     @Mock
     private WebSocketSession mockSession;
@@ -49,7 +52,7 @@ class WebSocketReconnectionTest {
 
     @BeforeEach
     void setUp() {
-        handler = new NapCatWebSocketHandler(webSocketClient, clientAdapter, messageRouter);
+        handler = new NapCatWebSocketHandler(webSocketClient, clientAdapter, messageRouterService, objectMapper);
         ReflectionTestUtils.setField(handler, "napCatWebSocketUrl", "ws://localhost:6700");
         ReflectionTestUtils.setField(handler, "accessToken", "test-token");
     }

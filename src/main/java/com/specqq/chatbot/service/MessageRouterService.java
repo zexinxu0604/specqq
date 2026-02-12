@@ -29,6 +29,8 @@ public class MessageRouterService {
 
     private final RuleEngineService ruleEngineService;
     private final HandlerRegistryService handlerRegistryService;
+    private final ExecutionLogService executionLogService;
+    private final MetricsService metricsService;
 
     /**
      * Route message through rule engine and execute handler
@@ -46,6 +48,9 @@ public class MessageRouterService {
         log.info("Message routing started: groupId={}, userId={}, messageId={}",
                 message.getGroupId(), message.getUserId(), message.getMessageId());
 
+        // T081: Record message received
+        metricsService.recordMessageReceived(message.getGroupId());
+
         try {
             // Step 1: Match rule with timeout
             CompletableFuture<Optional<MessageRule>> ruleFuture =
@@ -57,8 +62,17 @@ public class MessageRouterService {
 
             if (matchedRule.isEmpty()) {
                 log.debug("No rule matched, skipping handler execution");
+
+                // T081: Record no match
+                metricsService.recordRuleNoMatch();
+                executionLogService.logExecution(message, null, null, false,
+                        System.currentTimeMillis() - startTime, "No matching rule");
+
                 return CompletableFuture.completedFuture(Optional.empty());
             }
+
+            // T081: Record rule match
+            metricsService.recordRuleMatch();
 
             MessageRule rule = matchedRule.get();
             log.info("Rule matched: ruleId={}, ruleName={}", rule.getId(), rule.getName());
@@ -102,16 +116,26 @@ public class MessageRouterService {
 
             // Step 3: Execute handler with timeout
             MessageReplyDTO reply;
+            long handlerStartTime = System.currentTimeMillis();
             try {
                 final MessageHandler finalHandler = handler;
                 final String finalHandlerConfig = handlerConfig;
+                final String finalHandlerType = handlerType;
 
                 CompletableFuture<MessageReplyDTO> handlerFuture = CompletableFuture.supplyAsync(() -> {
                     try {
                         return finalHandler.handle(message, finalHandlerConfig);
                     } catch (Exception e) {
                         log.error("Handler execution failed: handlerType={}, ruleId={}",
-                                handlerType, rule.getId(), e);
+                                finalHandlerType, rule.getId(), e);
+
+                        // T081: Record handler failure
+                        long executionTime = System.currentTimeMillis() - handlerStartTime;
+                        metricsService.recordHandlerFailure(finalHandlerType);
+                        metricsService.recordHandlerExecutionTime(finalHandlerType, executionTime);
+                        executionLogService.logExecution(message, rule.getId(), finalHandlerType,
+                                false, executionTime, e.getMessage());
+
                         return null;
                     }
                 });
@@ -119,9 +143,23 @@ public class MessageRouterService {
                 reply = handlerFuture
                         .orTimeout(30, TimeUnit.SECONDS)
                         .get(30, TimeUnit.SECONDS);
+
+                // T081: Record handler success
+                long executionTime = System.currentTimeMillis() - handlerStartTime;
+                metricsService.recordHandlerSuccess(handlerType);
+                metricsService.recordHandlerExecutionTime(handlerType, executionTime);
+
             } catch (TimeoutException e) {
+                long executionTime = System.currentTimeMillis() - handlerStartTime;
                 log.error("Handler execution timeout: handlerType={}, ruleId={}",
                         handlerType, rule.getId(), e);
+
+                // T081: Record timeout as failure
+                metricsService.recordHandlerFailure(handlerType);
+                metricsService.recordHandlerExecutionTime(handlerType, executionTime);
+                executionLogService.logExecution(message, rule.getId(), handlerType,
+                        false, executionTime, "Handler execution timeout");
+
                 return CompletableFuture.completedFuture(Optional.empty());
             }
 
@@ -143,18 +181,34 @@ public class MessageRouterService {
             log.info("Message routing completed: ruleId={}, handlerType={}, elapsedMs={}",
                     rule.getId(), handlerType, elapsedTime);
 
+            // T081: Record message processed and routing time
+            metricsService.recordMessageProcessed(message.getGroupId());
+            metricsService.recordMessageRoutingTime(elapsedTime);
+            executionLogService.logExecution(message, rule.getId(), handlerType,
+                    true, elapsedTime, null);
+
             return CompletableFuture.completedFuture(Optional.of(reply));
 
         } catch (TimeoutException e) {
             long elapsedTime = System.currentTimeMillis() - startTime;
             log.error("Message routing timeout: groupId={}, elapsedMs={}",
                     message.getGroupId(), elapsedTime, e);
+
+            // T081: Record timeout
+            executionLogService.logExecution(message, null, null, false,
+                    elapsedTime, "Message routing timeout");
+
             return CompletableFuture.completedFuture(Optional.empty());
 
         } catch (Exception e) {
             long elapsedTime = System.currentTimeMillis() - startTime;
             log.error("Message routing failed: groupId={}, elapsedMs={}",
                     message.getGroupId(), elapsedTime, e);
+
+            // T081: Record general failure
+            executionLogService.logExecution(message, null, null, false,
+                    elapsedTime, e.getMessage());
+
             return CompletableFuture.completedFuture(Optional.empty());
         }
     }

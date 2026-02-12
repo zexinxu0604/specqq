@@ -39,7 +39,10 @@ class NapCatWebSocketIntegrationTest {
     private ClientAdapter clientAdapter;
 
     @Autowired
-    private MessageRouter messageRouter;
+    private com.specqq.chatbot.service.MessageRouterService messageRouterService;
+
+    @Autowired
+    private com.fasterxml.jackson.databind.ObjectMapper objectMapper;
 
     private NapCatWebSocketHandler handler;
     private MockWebServer mockWebServer;
@@ -47,7 +50,7 @@ class NapCatWebSocketIntegrationTest {
 
     @BeforeEach
     void setUp() throws IOException {
-        handler = new NapCatWebSocketHandler(webSocketClient, clientAdapter, messageRouter);
+        handler = new NapCatWebSocketHandler(webSocketClient, clientAdapter, messageRouterService, objectMapper);
 
         // 启动MockWebServer
         mockWebServer = new MockWebServer();

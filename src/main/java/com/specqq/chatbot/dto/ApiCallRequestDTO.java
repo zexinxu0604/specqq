@@ -45,6 +45,13 @@ public class ApiCallRequestDTO {
     private String id;
 
     /**
+     * Echo field (NapCat uses this for WebSocket response correlation)
+     * Set to same value as id
+     */
+    @JsonProperty("echo")
+    private String echo;
+
+    /**
      * API action name (e.g., "get_group_info", "get_group_member_info", "delete_msg")
      */
     @JsonProperty("action")
@@ -64,6 +71,7 @@ public class ApiCallRequestDTO {
      */
     public ApiCallRequestDTO() {
         this.id = UUID.randomUUID().toString();
+        this.echo = this.id;  // Set echo to same value as id for NapCat
     }
 
     /**
@@ -88,6 +96,7 @@ public class ApiCallRequestDTO {
     public ApiCallRequestDTO(String id, String action, Map<String, Object> params) {
         this.jsonrpc = "2.0";
         this.id = id;
+        this.echo = id;  // Set echo to same value as id for NapCat
         this.action = action;
         this.params = params;
     }
@@ -108,6 +117,15 @@ public class ApiCallRequestDTO {
 
     public void setId(String id) {
         this.id = id;
+        this.echo = id;  // Keep echo in sync with id
+    }
+
+    public String getEcho() {
+        return echo;
+    }
+
+    public void setEcho(String echo) {
+        this.echo = echo;
     }
 
     public String getAction() {

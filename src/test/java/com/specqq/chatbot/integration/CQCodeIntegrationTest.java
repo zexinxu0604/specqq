@@ -71,7 +71,7 @@ class CQCodeIntegrationTest {
         imageRule.setPriority(80);
         imageRule.setEnabled(true);
         imageRule.setCreatedBy(1L);
-        imageRule.setCreatedAt(LocalDateTime.now());
+        imageRule.setCreateTime(LocalDateTime.now());
         messageRuleMapper.insert(imageRule);
 
         // Bind rule to group
@@ -137,7 +137,7 @@ class CQCodeIntegrationTest {
         faceRule.setPriority(75);
         faceRule.setEnabled(true);
         faceRule.setCreatedBy(1L);
-        faceRule.setCreatedAt(LocalDateTime.now());
+        faceRule.setCreateTime(LocalDateTime.now());
         messageRuleMapper.insert(faceRule);
         GroupRuleConfig faceConfig = new GroupRuleConfig();
         faceConfig.setGroupId(testGroup.getId());
@@ -173,7 +173,7 @@ class CQCodeIntegrationTest {
         atRule.setPriority(90);
         atRule.setEnabled(true);
         atRule.setCreatedBy(1L);
-        atRule.setCreatedAt(LocalDateTime.now());
+        atRule.setCreateTime(LocalDateTime.now());
         messageRuleMapper.insert(atRule);
         GroupRuleConfig atConfig = new GroupRuleConfig();
         atConfig.setGroupId(testGroup.getId());
@@ -209,7 +209,7 @@ class CQCodeIntegrationTest {
         atRule.setPriority(90);
         atRule.setEnabled(true);
         atRule.setCreatedBy(1L);
-        atRule.setCreatedAt(LocalDateTime.now());
+        atRule.setCreateTime(LocalDateTime.now());
         messageRuleMapper.insert(atRule);
         GroupRuleConfig atConfig2 = new GroupRuleConfig();
         atConfig2.setGroupId(testGroup.getId());

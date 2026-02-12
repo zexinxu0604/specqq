@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -23,6 +24,8 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 import jakarta.annotation.PreDestroy;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -40,13 +43,24 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class NapCatWebSocketHandler extends TextWebSocketHandler {
 
     private final WebSocketClient webSocketClient;
     private final ClientAdapter clientAdapter;
     private final MessageRouterService messageRouterService;
     private final ObjectMapper objectMapper;
+
+    // Constructor with @Lazy to break circular dependency
+    public NapCatWebSocketHandler(
+            WebSocketClient webSocketClient,
+            @Lazy ClientAdapter clientAdapter,
+            MessageRouterService messageRouterService,
+            ObjectMapper objectMapper) {
+        this.webSocketClient = webSocketClient;
+        this.clientAdapter = clientAdapter;
+        this.messageRouterService = messageRouterService;
+        this.objectMapper = objectMapper;
+    }
 
     // NapCatAdapter for handling API responses (optional - may be null during initialization)
     @Autowired(required = false)
@@ -66,6 +80,10 @@ public class NapCatWebSocketHandler extends TextWebSocketHandler {
     private static final int MAX_RECONNECT_ATTEMPTS = 3;
     private static final int HEARTBEAT_TIMEOUT_SECONDS = 15;
     private static final int[] RECONNECT_DELAYS = {1, 2, 4, 8, 16, 60}; // 指数退避(秒)
+
+    // Message deduplication: track processed message IDs (with TTL cleanup)
+    private final Set<String> processedMessageIds = ConcurrentHashMap.newKeySet();
+    private static final int MESSAGE_ID_TTL_SECONDS = 60; // Keep message IDs for 60 seconds
 
     /**
      * 连接到NapCat WebSocket
@@ -118,8 +136,8 @@ public class NapCatWebSocketHandler extends TextWebSocketHandler {
             // 尝试解析为JSON对象以判断消息类型
             Map<String, Object> jsonMap = objectMapper.readValue(payload, Map.class);
 
-            // 检查是否是API响应 (包含 id, retcode, status 等字段)
-            if (jsonMap.containsKey("id") && (jsonMap.containsKey("retcode") || jsonMap.containsKey("status"))) {
+            // 检查是否是API响应 (包含 status 或 retcode 字段，但不包含 post_type)
+            if ((jsonMap.containsKey("status") || jsonMap.containsKey("retcode")) && !jsonMap.containsKey("post_type")) {
                 // 这是API调用响应
                 handleApiResponse(payload);
             } else if (jsonMap.containsKey("post_type")) {
@@ -165,6 +183,20 @@ public class NapCatWebSocketHandler extends TextWebSocketHandler {
             MessageReceiveDTO receivedMessage = clientAdapter.parseMessage(payload);
 
             if (receivedMessage != null) {
+                // Deduplication: Check if message was already processed
+                String messageId = receivedMessage.getMessageId();
+                if (messageId != null && !processedMessageIds.add(messageId)) {
+                    log.debug("Duplicate message detected, skipping: messageId={}", messageId);
+                    return;
+                }
+
+                // Schedule cleanup of old message IDs (fire and forget)
+                if (messageId != null) {
+                    scheduler.schedule(() -> {
+                        processedMessageIds.remove(messageId);
+                        log.trace("Removed old message ID from dedup cache: {}", messageId);
+                    }, MESSAGE_ID_TTL_SECONDS, TimeUnit.SECONDS);
+                }
                 // Route message asynchronously through new MessageRouterService
                 messageRouterService.routeMessage(receivedMessage)
                         .thenAccept(replyOpt -> {

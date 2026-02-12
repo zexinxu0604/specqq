@@ -47,6 +47,7 @@ public class CacheConfig {
             "rules",            // 规则缓存
             "compiledPatterns", // 编译后的正则表达式缓存
             "groupRules",       // 群规则列表缓存
+            "groups",           // 群聊信息缓存 (修复: 添加此缓存)
             "ruleGroupCache",   // 规则-群组缓存 (新增)
             "handlerMetadata",  // Handler 元数据缓存 (新增)
             "userRoles"         // 用户角色缓存 (新增)
