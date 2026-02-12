@@ -35,9 +35,9 @@
       </div>
     </el-form-item>
 
-    <el-form-item label="匹配模式" prop="matchPattern">
+    <el-form-item label="匹配模式" prop="pattern">
       <el-input
-        v-model="formData.matchPattern"
+        v-model="formData.pattern"
         placeholder="请输入匹配模式"
         clearable
         @blur="handlePatternBlur"
@@ -83,9 +83,9 @@
       </div>
     </el-form-item>
 
-    <el-form-item label="回复模板" prop="replyTemplate">
+    <el-form-item label="回复模板" prop="responseTemplate">
       <el-input
-        v-model="formData.replyTemplate"
+        v-model="formData.responseTemplate"
         type="textarea"
         :rows="4"
         placeholder="请输入回复模板"
@@ -125,6 +125,31 @@
       />
     </el-form-item>
 
+    <!-- Policy Configuration Section -->
+    <el-divider content-position="left">
+      <el-icon><Lock /></el-icon>
+      策略配置
+    </el-divider>
+
+    <PolicyEditor
+      ref="policyEditorRef"
+      v-model="formData.policy"
+    />
+
+    <!-- Handler Configuration Section -->
+    <el-divider content-position="left">
+      <el-icon><Tools /></el-icon>
+      处理器配置
+    </el-divider>
+
+    <el-form-item label="处理器类型" prop="handlerType">
+      <HandlerSelector
+        ref="handlerSelectorRef"
+        v-model:handler-type="formData.handlerType"
+        v-model:handler-params="formData.handlerParams"
+      />
+    </el-form-item>
+
     <!-- 测试区域 -->
     <el-divider content-position="left">规则测试</el-divider>
 
@@ -160,13 +185,17 @@
 import { ref, reactive, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import { CircleCheck, Promotion } from '@element-plus/icons-vue'
+import { CircleCheck, Promotion, Lock, Tools } from '@element-plus/icons-vue'
 import { validatePattern as validatePatternApi, testRuleMatch, checkNameUnique as checkNameUniqueApi } from '@/api/modules/rule.api'
 import { MatchType, MatchTypeLabels } from '@/types/rule'
 import type { CreateRuleRequest, UpdateRuleRequest, TestRuleResponse, ValidatePatternResponse } from '@/types/rule'
 import CQCodeSelector from '@/components/CQCodeSelector.vue'
 import CQCodePreview from '@/components/CQCodePreview.vue'
+import PolicyEditor from '@/components/PolicyEditor.vue'
+import HandlerSelector from '@/components/HandlerSelector.vue'
 import type { CQCodePattern } from '@/types/cqcode'
+import type { PolicyDTO } from '@/types/policy'
+import { DEFAULT_POLICY } from '@/types/policy'
 
 // Simple debounce helper function
 function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
@@ -180,6 +209,7 @@ function debounce<T extends (...args: any[]) => any>(func: T, wait: number): T {
 interface Props {
   modelValue: CreateRuleRequest | UpdateRuleRequest
   isEdit?: boolean
+  ruleId?: number  // 当前编辑规则的ID
 }
 
 interface Emits {
@@ -187,22 +217,28 @@ interface Emits {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  isEdit: false
+  isEdit: false,
+  ruleId: undefined
 })
 
 const emit = defineEmits<Emits>()
 
 // 表单引用
 const formRef = ref<FormInstance>()
+const policyEditorRef = ref()
+const handlerSelectorRef = ref()
 
 // 表单数据
 const formData = reactive<CreateRuleRequest | UpdateRuleRequest>({
   name: '',
-  matchType: MatchType.KEYWORD,
-  matchPattern: '',
-  replyTemplate: '',
+  matchType: MatchType.CONTAINS,
+  pattern: '',
+  responseTemplate: '',
   priority: 50,
   description: '',
+  policy: DEFAULT_POLICY,
+  handlerType: undefined,
+  handlerParams: {},
   ...props.modelValue
 })
 
@@ -221,7 +257,7 @@ const handleCQCodePatternChange = (pattern: CQCodePattern | null) => {
 
   if (pattern) {
     // Auto-fill the match pattern with the selected CQ code pattern
-    formData.matchPattern = pattern.pattern
+    formData.pattern = pattern.pattern
 
     // Auto-validate the pattern
     patternValidation.value = {
@@ -257,7 +293,9 @@ const validateNameUnique = debounce(async (_rule: any, value: string, callback: 
   }
 
   try {
-    const excludeId = props.isEdit && (formData as any).id ? (formData as any).id : undefined
+    // 使用传入的 ruleId prop 来排除当前规则
+    const excludeId = props.isEdit && props.ruleId ? props.ruleId : undefined
+    console.log('验证名称唯一性: name=', value, 'excludeId=', excludeId)
     const response = await checkNameUniqueApi(value, excludeId)
 
     if (response.data && !response.data.unique) {
@@ -282,10 +320,10 @@ const formRules: FormRules = {
   matchType: [
     { required: true, message: '请选择匹配类型', trigger: 'change' }
   ],
-  matchPattern: [
+  pattern: [
     { required: true, message: '请输入匹配模式', trigger: 'blur' }
   ],
-  replyTemplate: [
+  responseTemplate: [
     { required: true, message: '请输入回复模板', trigger: 'blur' },
     { min: 1, max: 500, message: '回复模板长度在1-500个字符', trigger: 'blur' }
   ],
@@ -297,7 +335,7 @@ const formRules: FormRules = {
 // 匹配类型提示
 const getMatchTypeTip = (type: MatchType): string => {
   const tips: Record<MatchType, string> = {
-    [MatchType.KEYWORD]: '消息中包含关键词即可匹配',
+    [MatchType.CONTAINS]: '消息中包含关键词即可匹配',
     [MatchType.REGEX]: '使用正则表达式进行匹配',
     [MatchType.PREFIX]: '消息以指定前缀开头时匹配',
     [MatchType.SUFFIX]: '消息以指定后缀结尾时匹配',
@@ -317,7 +355,7 @@ const validating = ref(false)
 const patternValidation = ref<ValidatePatternResponse>({ valid: false, message: '' })
 
 const validatePattern = async () => {
-  if (!formData.matchPattern) {
+  if (!formData.pattern) {
     ElMessage.warning('请先输入匹配模式')
     return
   }
@@ -330,7 +368,7 @@ const validatePattern = async () => {
 
   validating.value = true
   try {
-    const response = await validatePatternApi(formData.matchPattern)
+    const response = await validatePatternApi(formData.pattern)
     patternValidation.value = response.data
     if (response.data.valid) {
       ElMessage.success('正则表达式验证通过')
@@ -344,7 +382,7 @@ const validatePattern = async () => {
 
 // 模式失焦时自动验证
 const handlePatternBlur = () => {
-  if (formData.matchPattern && formData.matchType === MatchType.REGEX) {
+  if (formData.pattern && formData.matchType === MatchType.REGEX) {
     validatePattern()
   }
 }
@@ -366,7 +404,7 @@ const testRule = async () => {
     return
   }
 
-  if (!formData.matchType || !formData.matchPattern) {
+  if (!formData.matchType || !formData.pattern) {
     ElMessage.warning('请先填写匹配类型和匹配模式')
     return
   }
@@ -375,7 +413,7 @@ const testRule = async () => {
   try {
     const response = await testRuleMatch({
       matchType: formData.matchType,
-      matchPattern: formData.matchPattern,
+      pattern: formData.pattern,
       testMessage: testMessage.value
     })
     testResult.value = response.data
@@ -391,7 +429,14 @@ const validate = async (): Promise<boolean> => {
   if (!formRef.value) return false
 
   try {
+    // Validate main form
     await formRef.value.validate()
+
+    // Validate policy editor
+    if (policyEditorRef.value) {
+      await policyEditorRef.value.validate()
+    }
+
     return true
   } catch {
     return false
@@ -406,9 +451,22 @@ const resetFields = () => {
   testMessage.value = ''
 }
 
+// 获取处理后的表单数据（应用条件字段发送逻辑）
+const getFormData = () => {
+  const data = { ...formData }
+
+  // 从 PolicyEditor 获取处理后的 policy（应用条件字段发送逻辑）
+  if (policyEditorRef.value && policyEditorRef.value.getPolicyDTO) {
+    data.policy = policyEditorRef.value.getPolicyDTO()
+  }
+
+  return data
+}
+
 defineExpose({
   validate,
-  resetFields
+  resetFields,
+  getFormData
 })
 </script>
 

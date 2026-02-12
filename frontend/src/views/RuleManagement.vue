@@ -408,8 +408,9 @@ const handleSubmit = async () => {
 
   submitting.value = true
   try {
-    // 准备提交数据：将 handlerType 和 handlerParams 转换为 handlerConfig JSON 字符串
-    const submitData: any = { ...currentRule.value }
+    // 从 RuleForm 获取处理后的数据（应用条件字段发送逻辑）
+    const formData = ruleFormRef.value?.getFormData ? ruleFormRef.value.getFormData() : currentRule.value
+    const submitData: any = { ...formData }
 
     // 如果有 handlerType，构建 handlerConfig JSON
     if (submitData.handlerType) {
