@@ -9,7 +9,9 @@ import com.specqq.chatbot.dto.GroupSyncResultDTO;
 import com.specqq.chatbot.entity.ChatClient;
 import com.specqq.chatbot.entity.GroupChat;
 import com.specqq.chatbot.enums.SyncStatus;
+import com.specqq.chatbot.mapper.ChatClientMapper;
 import com.specqq.chatbot.mapper.GroupChatMapper;
+import com.specqq.chatbot.service.impl.GroupSyncServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 
 import java.time.LocalDateTime;
 import java.util.*;
@@ -42,7 +45,13 @@ class GroupSyncServiceTest {
     private GroupChatMapper groupChatMapper;
 
     @Mock
+    private ChatClientMapper chatClientMapper;
+
+    @Mock
     private ClientAdapterFactory clientAdapterFactory;
+
+    @Mock
+    private ApplicationEventPublisher eventPublisher;
 
     @Mock
     private NapCatAdapter napCatAdapter;
@@ -54,6 +63,14 @@ class GroupSyncServiceTest {
 
     @BeforeEach
     void setUp() {
+        // 初始化服务
+        groupSyncService = new GroupSyncServiceImpl(
+            groupChatMapper,
+            chatClientMapper,
+            clientAdapterFactory,
+            eventPublisher
+        );
+
         // 初始化测试数据
         testClient = new ChatClient();
         testClient.setId(1L);
@@ -120,7 +137,7 @@ class GroupSyncServiceTest {
     void testSyncGroup_Failure_BotRemoved() {
         // Given
         when(clientAdapterFactory.getAdapter(testClient.getProtocolType())).thenReturn(napCatAdapter);
-        when(napCatAdapter.getGroupInfo(anyLong())).thenReturn(null); // Bot not in group
+        when(napCatAdapter.getGroupInfo(anyLong())).thenReturn(CompletableFuture.completedFuture(null)); // Bot not in group
 
         // When
         GroupSyncResultDTO result = groupSyncService.syncGroup(testGroup);

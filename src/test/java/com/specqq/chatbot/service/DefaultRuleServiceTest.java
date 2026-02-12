@@ -7,6 +7,7 @@ import com.specqq.chatbot.entity.MessageRule;
 import com.specqq.chatbot.mapper.GroupChatMapper;
 import com.specqq.chatbot.mapper.GroupRuleConfigMapper;
 import com.specqq.chatbot.mapper.MessageRuleMapper;
+import com.specqq.chatbot.service.impl.DefaultRuleServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -51,7 +52,13 @@ class DefaultRuleServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Service will be injected in actual implementation
+        // 初始化服务
+        defaultRuleService = new DefaultRuleServiceImpl(
+            systemConfigService,
+            messageRuleMapper,
+            groupRuleConfigMapper,
+            groupChatMapper
+        );
     }
 
     @Test

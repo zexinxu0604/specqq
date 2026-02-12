@@ -5,6 +5,7 @@ import com.specqq.chatbot.constant.SystemConfigKeys;
 import com.specqq.chatbot.dto.DefaultRuleConfigDTO;
 import com.specqq.chatbot.entity.SystemConfig;
 import com.specqq.chatbot.mapper.SystemConfigMapper;
+import com.specqq.chatbot.service.impl.SystemConfigServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -42,7 +43,11 @@ class SystemConfigServiceTest {
 
     @BeforeEach
     void setUp() {
-        // Service will be injected in actual implementation
+        // 初始化服务
+        systemConfigService = new SystemConfigServiceImpl(
+            systemConfigMapper,
+            objectMapper
+        );
     }
 
     @Test
