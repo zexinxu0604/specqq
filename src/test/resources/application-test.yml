@@ -40,6 +40,39 @@ jwt:
   secret: test-secret-key-for-testing-only-minimum-32-characters-required
   expiration: 86400000
 
+# Sync Task Configuration (Test)
+sync:
+  task:
+    cron: "0 0 */12 * * ?"  # Every 12 hours (less frequent for tests)
+  retry:
+    cron: "0 0 */2 * * ?"   # Every 2 hours
+  default-rules:
+    cron: "0 0 3 * * ?"     # Daily at 3 AM
+
+# Resilience4j Retry Configuration (Test)
+resilience4j:
+  retry:
+    instances:
+      groupSync:
+        max-attempts: 2  # Fewer attempts for faster tests
+        wait-duration: 10s  # Shorter wait for tests
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.io.IOException
+          - java.net.SocketTimeoutException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+
+# Caffeine Cache Configuration (Test)
+caffeine:
+  cache:
+    system-config:
+      expire-after-write: 60s  # Shorter expiry for tests
+      maximum-size: 50
+    group-sync:
+      expire-after-write: 30s
+      maximum-size: 100
+
 # Logging
 logging:
   level:

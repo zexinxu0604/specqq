@@ -31,3 +31,44 @@ logging:
   level:
     root: INFO
     com.specqq.chatbot: INFO
+
+# Caffeine Cache Configuration
+caffeine:
+  cache:
+    system-config:
+      expire-after-write: 300s  # 5 minutes
+      maximum-size: 100
+    group-sync:
+      expire-after-write: 60s   # 1 minute
+      maximum-size: 1000
+
+# Spring Scheduler Configuration
+spring:
+  task:
+    scheduling:
+      pool:
+        size: 5
+      thread-name-prefix: scheduler-
+
+# Resilience4j Retry Configuration
+resilience4j:
+  retry:
+    instances:
+      groupSync:
+        max-attempts: 3
+        wait-duration: 30s
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.io.IOException
+          - java.net.SocketTimeoutException
+          - org.springframework.web.client.ResourceAccessException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+          - java.lang.NullPointerException
+
+# Sync Task Configuration
+sync:
+  task:
+    cron: "0 0 */6 * * ?"  # Every 6 hours
+  retry:
+    cron: "0 0 * * * ?"    # Every hour

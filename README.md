@@ -99,11 +99,19 @@ open http://localhost:5173
    - 日志管理(查询、导出、统计)
    - JWT认证和权限控制
 
-3. **多客户端协议适配** (User Story 3) ⏳
+3. **群组自动同步与规则管理** (Feature 004) 🆕
+   - 自动发现新群组 (从NapCat获取机器人所在群组)
+   - 定时同步群组信息 (每6小时自动同步成员数、群名等)
+   - 失败重试机制 (Resilience4j指数退避重试)
+   - 默认规则自动绑定 (新群组自动应用预设规则)
+   - 同步状态监控 (失败告警、手动重置)
+   - 系统配置管理 (Caffeine缓存、JSON配置)
+
+4. **多客户端协议适配** (User Story 3) ⏳
    - 抽象协议层设计
    - 支持扩展到微信、钉钉等平台
 
-4. **CQ码解析与消息统计** (Feature 002) ✅
+5. **CQ码解析与消息统计** (Feature 002) ✅
    - 解析OneBot 11协议CQ码 (表情、图片、@提及等)
    - 实时消息统计 (字数、CQ码类型统计)
    - CQ码规则匹配 (支持正则表达式模式)
@@ -122,6 +130,8 @@ open http://localhost:5173
 - Spring Security + JWT 0.12.3 ✅ (已升级)
 - Apache HttpClient 5.3 ✅
 - SpringDoc OpenAPI 2.3.0
+- Resilience4j 2.1.0 🆕 (重试机制)
+- Caffeine 3.1.8 🆕 (本地缓存)
 
 **前端**:
 - Vue 3.4+ (Composition API)

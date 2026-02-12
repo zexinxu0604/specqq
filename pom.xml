@@ -119,6 +119,18 @@
             <version>${caffeine.version}</version>
         </dependency>
 
+        <!-- Resilience4j Retry -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-spring-boot3</artifactId>
+            <version>2.1.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-retry</artifactId>
+            <version>2.1.0</version>
+        </dependency>
+
         <!-- Apache HttpClient 5 (NapCat HTTP API) -->
         <dependency>
             <groupId>org.apache.httpcomponents.client5</groupId>

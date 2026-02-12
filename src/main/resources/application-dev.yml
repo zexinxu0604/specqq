@@ -53,6 +53,13 @@ caffeine:
   compiled-regex:
     maximum-size: 1000
     expire-after-write: 2h
+  cache:
+    system-config:
+      expire-after-write: 300s  # 5 minutes
+      maximum-size: 100
+    group-sync:
+      expire-after-write: 60s   # 1 minute
+      maximum-size: 1000
 
 # NapCat连接配置
 napcat:
@@ -86,6 +93,31 @@ rule-engine:
 jwt:
   secret: ${JWT_SECRET:your-secret-key-min-32-characters-for-hs256}
   expiration: 86400000  # 24 hours in milliseconds
+
+# Sync Task Configuration
+sync:
+  task:
+    cron: "0 0 */6 * * ?"  # Every 6 hours
+  retry:
+    cron: "0 0 * * * ?"    # Every hour
+  default-rules:
+    cron: "0 0 2 * * ?"    # Daily at 2 AM
+
+# Resilience4j Retry Configuration
+resilience4j:
+  retry:
+    instances:
+      groupSync:
+        max-attempts: 3
+        wait-duration: 30s
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - java.io.IOException
+          - java.net.SocketTimeoutException
+          - org.springframework.web.client.ResourceAccessException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+          - java.lang.NullPointerException
 
 # SpringDoc OpenAPI配置
 springdoc:

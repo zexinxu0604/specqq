@@ -526,6 +526,48 @@ logging:
     name: logs/chatbot-router.log
 ```
 
+#### 6. 群组同步配置 (Feature 004 🆕)
+
+```yaml
+# 同步任务配置
+sync:
+  task:
+    cron: "0 0 */6 * * ?"  # 每6小时执行一次全量同步
+  retry:
+    cron: "0 0 * * * ?"    # 每小时重试失败的群组
+
+# Resilience4j 重试策略
+resilience4j:
+  retry:
+    instances:
+      groupSync:
+        max-attempts: 3              # 最大重试次数
+        wait-duration: 30s           # 初始等待时间
+        exponential-backoff-multiplier: 2  # 指数退避倍数
+        retry-exceptions:
+          - java.io.IOException
+          - java.net.SocketTimeoutException
+        ignore-exceptions:
+          - java.lang.IllegalArgumentException
+
+# Caffeine 缓存配置
+caffeine:
+  cache:
+    system-config:
+      expire-after-write: 300s  # 系统配置缓存5分钟
+      maximum-size: 100
+    group-sync:
+      expire-after-write: 60s   # 同步状态缓存1分钟
+      maximum-size: 1000
+```
+
+**说明**:
+- **自动同步**: 系统每6小时自动同步所有活跃群组的信息（群名、成员数等）
+- **失败重试**: 每小时自动重试同步失败的群组，使用指数退避策略
+- **告警机制**: 连续失败3次以上的群组会触发告警
+- **手动操作**: 可通过API手动触发同步或重置失败计数
+- **默认规则**: 新发现的群组自动绑定预设的默认规则
+
 ---
 
 ## ❓ 常见问题

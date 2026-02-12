@@ -57,6 +57,7 @@ declare module 'vue' {
     ElText: typeof import('element-plus/es')['ElText']
     ElTimePicker: typeof import('element-plus/es')['ElTimePicker']
     GroupSelector: typeof import('./../components/GroupSelector.vue')['default']
+    GroupSyncStatus: typeof import('./../components/GroupSyncStatus.vue')['default']
     HandlerSelector: typeof import('./../components/HandlerSelector.vue')['default']
     PolicyEditor: typeof import('./../components/PolicyEditor.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']

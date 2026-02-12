@@ -63,4 +63,35 @@
         ORDER BY g.id, r.priority DESC, r.created_at ASC
     </select>
 
+    <!-- 查询所有活跃群组（需要同步的群组） -->
+    <select id="selectActiveGroups" resultType="com.specqq.chatbot.entity.GroupChat">
+        SELECT * FROM group_chat
+        WHERE active = TRUE
+          AND enabled = TRUE
+        ORDER BY last_sync_time ASC NULLS FIRST
+    </select>
+
+    <!-- 查询同步失败的群组 -->
+    <select id="selectFailedGroups" resultType="com.specqq.chatbot.entity.GroupChat">
+        SELECT * FROM group_chat
+        WHERE sync_status = 'FAILED'
+          AND consecutive_failure_count >= #{minFailureCount}
+        ORDER BY consecutive_failure_count DESC, last_failure_time DESC
+    </select>
+
+    <!-- 批量更新群组同步状态 -->
+    <update id="batchUpdateSyncStatus">
+        <foreach collection="groups" item="group" separator=";">
+            UPDATE group_chat
+            SET last_sync_time = #{group.lastSyncTime},
+                sync_status = #{group.syncStatus},
+                last_failure_time = #{group.lastFailureTime},
+                failure_reason = #{group.failureReason},
+                consecutive_failure_count = #{group.consecutiveFailureCount},
+                active = #{group.active},
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = #{group.id}
+        </foreach>
+    </update>
+
 </mapper>

@@ -1,10 +1,18 @@
 <template>
   <div class="group-management">
+    <!-- Sync Status Card -->
+    <GroupSyncStatus />
+
     <el-card shadow="never">
       <template #header>
         <div class="card-header">
           <span>群聊管理</span>
-          <el-button type="primary" :icon="Plus">批量导入</el-button>
+          <div class="header-actions">
+            <el-button type="success" :icon="Search" @click="handleDiscoverGroups">
+              发现新群组
+            </el-button>
+            <el-button type="primary" :icon="Plus">批量导入</el-button>
+          </div>
         </div>
       </template>
 
@@ -46,10 +54,14 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Plus } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Search } from '@element-plus/icons-vue'
 import { listGroups, toggleGroupStatus } from '@/api/modules/group.api'
+import { useGroupSyncStore } from '@/stores/groupSync'
+import GroupSyncStatus from '@/components/GroupSyncStatus.vue'
 import type { GroupChat } from '@/types/group'
+
+const groupSyncStore = useGroupSyncStore()
 
 const groups = ref<GroupChat[]>([])
 const loading = ref(false)
@@ -91,15 +103,53 @@ const formatDateTime = (dateTime: string): string => {
   return new Date(dateTime).toLocaleString('zh-CN')
 }
 
+const handleDiscoverGroups = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '将从NapCat获取机器人所在的所有群组，并添加尚未记录的新群组。确定继续吗？',
+      '发现新群组',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    )
+
+    // Assuming clientId is 1 for now - in production, this should be selected by user
+    const clientId = 1
+    const count = await groupSyncStore.discoverNewGroups(clientId)
+
+    if (count > 0) {
+      ElMessage.success(`成功发现并添加 ${count} 个新群组`)
+      await loadGroups() // Refresh the list
+    } else {
+      ElMessage.info('没有发现新群组')
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '发现新群组失败')
+    }
+  }
+}
+
 onMounted(() => {
   loadGroups()
 })
 </script>
 
 <style scoped lang="scss">
+.group-management {
+  padding: 20px;
+}
+
 .card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
 }
 </style>

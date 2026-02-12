@@ -2,6 +2,7 @@ package com.specqq.chatbot.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler;
+import com.specqq.chatbot.enums.SyncStatus;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -71,6 +72,44 @@ public class GroupChat {
     @TableField(value = "updated_at", fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
 
+    // === 同步状态字段 (V7 Migration) ===
+
+    /**
+     * 最后成功同步时间
+     */
+    @TableField("last_sync_time")
+    private LocalDateTime lastSyncTime;
+
+    /**
+     * 同步状态: SUCCESS, FAILED
+     */
+    @TableField("sync_status")
+    private SyncStatus syncStatus;
+
+    /**
+     * 最后失败时间
+     */
+    @TableField("last_failure_time")
+    private LocalDateTime lastFailureTime;
+
+    /**
+     * 失败原因（最大500字符）
+     */
+    @TableField("failure_reason")
+    private String failureReason;
+
+    /**
+     * 连续失败次数
+     */
+    @TableField("consecutive_failure_count")
+    private Integer consecutiveFailureCount;
+
+    /**
+     * 机器人是否仍在群组中
+     */
+    @TableField("active")
+    private Boolean active;
+
     /**
      * 所属客户端(非数据库字段)
      */
@@ -92,5 +131,47 @@ public class GroupChat {
         private Integer cooldownSeconds = 5;
         private List<String> allowedCommands;
         private List<String> blacklistedWords;
+    }
+
+    // === 业务方法 (Sync Management) ===
+
+    /**
+     * 标记同步成功
+     * 重置失败计数和失败原因
+     */
+    public void markSyncSuccess() {
+        this.lastSyncTime = LocalDateTime.now();
+        this.syncStatus = SyncStatus.SUCCESS;
+        this.consecutiveFailureCount = 0;
+        this.failureReason = null;
+    }
+
+    /**
+     * 标记同步失败
+     *
+     * @param reason 失败原因
+     */
+    public void markSyncFailure(String reason) {
+        this.lastFailureTime = LocalDateTime.now();
+        this.syncStatus = SyncStatus.FAILED;
+        this.failureReason = reason;
+        this.consecutiveFailureCount = (this.consecutiveFailureCount == null ? 0 : this.consecutiveFailureCount) + 1;
+    }
+
+    /**
+     * 重置失败计数（用于手动干预后）
+     */
+    public void resetFailureCount() {
+        this.consecutiveFailureCount = 0;
+        this.failureReason = null;
+    }
+
+    /**
+     * 判断是否需要告警（连续失败3次以上）
+     *
+     * @return true 如果需要告警
+     */
+    public boolean needsAlert() {
+        return this.consecutiveFailureCount != null && this.consecutiveFailureCount >= 3;
     }
 }

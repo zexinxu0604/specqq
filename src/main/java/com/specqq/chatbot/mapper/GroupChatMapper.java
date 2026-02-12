@@ -24,4 +24,27 @@ public interface GroupChatMapper extends BaseMapper<GroupChat> {
      */
     List<GroupChat> selectWithRules(@Param("clientId") Long clientId,
                                      @Param("enabled") Boolean enabled);
+
+    /**
+     * 查询所有活跃群组（需要同步的群组）
+     *
+     * @return 活跃群组列表
+     */
+    List<GroupChat> selectActiveGroups();
+
+    /**
+     * 查询同步失败的群组
+     *
+     * @param minFailureCount 最小连续失败次数
+     * @return 失败群组列表
+     */
+    List<GroupChat> selectFailedGroups(@Param("minFailureCount") Integer minFailureCount);
+
+    /**
+     * 批量更新群组同步状态
+     *
+     * @param groups 群组列表
+     * @return 更新记录数
+     */
+    int batchUpdateSyncStatus(@Param("groups") List<GroupChat> groups);
 }
