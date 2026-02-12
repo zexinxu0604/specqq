@@ -194,76 +194,19 @@ public class GroupSyncServiceImpl implements GroupSyncService {
         log.info("开始自动发现新群组: clientId={}", clientId);
 
         try {
-            // 获取客户端
-            ChatClient client = chatClientMapper.selectById(clientId);
+            ChatClient client = getChatClient(clientId);
             if (client == null) {
-                log.error("客户端不存在: clientId={}", clientId);
                 return 0;
             }
 
-            // 获取适配器
-            log.debug("获取客户端适配器用于群组发现: protocolType={}", client.getProtocolType());
-            ClientAdapter adapter = clientAdapterFactory.getAdapter(client.getProtocolType());
-            if (!(adapter instanceof NapCatAdapter napCatAdapter)) {
-                throw new IllegalStateException("Only NapCat adapter is supported for discovery");
-            }
-
-            // 调用 NapCat API 获取群组列表
-            log.debug("调用NapCat API获取群组列表");
-            CompletableFuture<ApiCallResponseDTO> future = napCatAdapter.getGroupList();
-            ApiCallResponseDTO response = future.join();
-
-            if (response == null || response.getRetcode() != 0) {
-                log.error("获取群组列表失败: clientId={}, retcode={}",
-                        clientId, response != null ? response.getRetcode() : "null");
-                return 0;
-            }
-
-            // 解析群组列表
-            List<Map<String, Object>> groupList = (List<Map<String, Object>>) response.getData().get("groups");
-            log.debug("NapCat返回群组列表: totalCount={}", groupList != null ? groupList.size() : 0);
+            List<Map<String, Object>> groupList = fetchGroupListFromAdapter(client, clientId);
             if (groupList == null || groupList.isEmpty()) {
-                log.info("未发现新群组: clientId={}", clientId);
                 return 0;
             }
 
-            // 查询已存在的群组
-            List<GroupChat> existingGroups = groupChatMapper.selectList(null);
-            List<String> existingGroupIds = existingGroups.stream()
-                    .map(GroupChat::getGroupId)
-                    .collect(Collectors.toList());
-            log.debug("当前已存在群组数量: {}", existingGroupIds.size());
+            List<GroupChat> newGroups = processAndSaveNewGroups(groupList, clientId);
 
-            // 添加新群组
-            List<GroupChat> newGroups = new ArrayList<>();
-            for (Map<String, Object> groupData : groupList) {
-                String groupId = String.valueOf(groupData.get("group_id"));
-                if (!existingGroupIds.contains(groupId)) {
-                    GroupChat newGroup = new GroupChat();
-                    newGroup.setGroupId(groupId);
-                    newGroup.setGroupName((String) groupData.get("group_name"));
-                    newGroup.setClientId(clientId);
-                    newGroup.setMemberCount(getIntValue(groupData, "member_count"));
-                    newGroup.setEnabled(true);
-                    newGroup.setActive(true);
-                    newGroup.setSyncStatus(SyncStatus.SUCCESS);
-                    newGroup.setLastSyncTime(LocalDateTime.now());
-
-                    groupChatMapper.insert(newGroup);
-                    newGroups.add(newGroup);
-                    log.info("新增群组: groupId={}, groupName={}", groupId, newGroup.getGroupName());
-                }
-            }
-
-            // 发布群组发现事件（触发自动绑定默认规则）
-            if (!newGroups.isEmpty()) {
-                GroupDiscoveryEvent event = new GroupDiscoveryEvent(this, newGroups, clientId);
-                eventPublisher.publishEvent(event);
-                log.info("发布群组发现事件: clientId={}, newGroupCount={}", clientId, newGroups.size());
-
-                // Record group discovery metric
-                metricsService.recordGroupDiscovery(newGroups.size());
-            }
+            publishGroupDiscoveryEvent(newGroups, clientId);
 
             log.info("自动发现完成: clientId={}, newGroups={}", clientId, newGroups.size());
             return newGroups.size();
@@ -271,6 +214,100 @@ public class GroupSyncServiceImpl implements GroupSyncService {
         } catch (Exception e) {
             log.error("自动发现新群组失败: clientId={}", clientId, e);
             return 0;
+        }
+    }
+
+    /**
+     * 获取客户端信息
+     */
+    private ChatClient getChatClient(Long clientId) {
+        ChatClient client = chatClientMapper.selectById(clientId);
+        if (client == null) {
+            log.error("客户端不存在: clientId={}", clientId);
+        }
+        return client;
+    }
+
+    /**
+     * 从适配器获取群组列表
+     */
+    private List<Map<String, Object>> fetchGroupListFromAdapter(ChatClient client, Long clientId) {
+        log.debug("获取客户端适配器用于群组发现: protocolType={}", client.getProtocolType());
+        ClientAdapter adapter = clientAdapterFactory.getAdapter(client.getProtocolType());
+        if (!(adapter instanceof NapCatAdapter napCatAdapter)) {
+            throw new IllegalStateException("Only NapCat adapter is supported for discovery");
+        }
+
+        log.debug("调用NapCat API获取群组列表");
+        CompletableFuture<ApiCallResponseDTO> future = napCatAdapter.getGroupList();
+        ApiCallResponseDTO response = future.join();
+
+        if (response == null || response.getRetcode() != 0) {
+            log.error("获取群组列表失败: clientId={}, retcode={}",
+                    clientId, response != null ? response.getRetcode() : "null");
+            return null;
+        }
+
+        List<Map<String, Object>> groupList = (List<Map<String, Object>>) response.getData().get("groups");
+        log.debug("NapCat返回群组列表: totalCount={}", groupList != null ? groupList.size() : 0);
+
+        if (groupList == null || groupList.isEmpty()) {
+            log.info("未发现新群组: clientId={}", clientId);
+        }
+
+        return groupList;
+    }
+
+    /**
+     * 处理并保存新群组
+     */
+    private List<GroupChat> processAndSaveNewGroups(List<Map<String, Object>> groupList, Long clientId) {
+        List<GroupChat> existingGroups = groupChatMapper.selectList(null);
+        List<String> existingGroupIds = existingGroups.stream()
+                .map(GroupChat::getGroupId)
+                .collect(Collectors.toList());
+        log.debug("当前已存在群组数量: {}", existingGroupIds.size());
+
+        List<GroupChat> newGroups = new ArrayList<>();
+        for (Map<String, Object> groupData : groupList) {
+            String groupId = String.valueOf(groupData.get("group_id"));
+            if (!existingGroupIds.contains(groupId)) {
+                GroupChat newGroup = createNewGroup(groupData, clientId);
+                groupChatMapper.insert(newGroup);
+                newGroups.add(newGroup);
+                log.info("新增群组: groupId={}, groupName={}", groupId, newGroup.getGroupName());
+            }
+        }
+
+        return newGroups;
+    }
+
+    /**
+     * 创建新群组实体
+     */
+    private GroupChat createNewGroup(Map<String, Object> groupData, Long clientId) {
+        GroupChat newGroup = new GroupChat();
+        newGroup.setGroupId(String.valueOf(groupData.get("group_id")));
+        newGroup.setGroupName((String) groupData.get("group_name"));
+        newGroup.setClientId(clientId);
+        newGroup.setMemberCount(getIntValue(groupData, "member_count"));
+        newGroup.setEnabled(true);
+        newGroup.setActive(true);
+        newGroup.setSyncStatus(SyncStatus.SUCCESS);
+        newGroup.setLastSyncTime(LocalDateTime.now());
+        return newGroup;
+    }
+
+    /**
+     * 发布群组发现事件
+     */
+    private void publishGroupDiscoveryEvent(List<GroupChat> newGroups, Long clientId) {
+        if (!newGroups.isEmpty()) {
+            GroupDiscoveryEvent event = new GroupDiscoveryEvent(this, newGroups, clientId);
+            eventPublisher.publishEvent(event);
+            log.info("发布群组发现事件: clientId={}, newGroupCount={}", clientId, newGroups.size());
+
+            metricsService.recordGroupDiscovery(newGroups.size());
         }
     }
 
