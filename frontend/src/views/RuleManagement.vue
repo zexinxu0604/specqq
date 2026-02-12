@@ -215,6 +215,7 @@
       :title="dialogTitle"
       width="700px"
       :close-on-click-modal="false"
+      @close="handleDialogClose"
     >
       <RuleForm
         ref="ruleFormRef"
@@ -258,6 +259,7 @@ import { useRulesStore } from '@/stores/rules.store'
 import { MatchType, MatchTypeLabels } from '@/types/rule'
 import type { Rule, CreateRuleRequest, UpdateRuleRequest } from '@/types/rule'
 import type { PolicyDTO } from '@/types/policy'
+import { DEFAULT_POLICY } from '@/types/policy'
 
 const rulesStore = useRulesStore()
 
@@ -398,6 +400,30 @@ const handleEdit = async (rule: Rule) => {
   } catch (error: any) {
     ElMessage.error(error.message || '获取规则详情失败')
   }
+}
+
+// 处理对话框关闭
+const handleDialogClose = () => {
+  // 重置表单数据
+  if (ruleFormRef.value) {
+    ruleFormRef.value.resetFields()
+  }
+
+  // 清空当前规则数据
+  currentRule.value = {
+    name: '',
+    matchType: MatchType.CONTAINS,
+    pattern: '',
+    responseTemplate: '',
+    priority: 50,
+    description: '',
+    policy: DEFAULT_POLICY,
+    handlerType: undefined,
+    handlerParams: {}
+  }
+
+  // 清空规则ID
+  currentRuleId.value = null
 }
 
 // 提交表单
