@@ -3,6 +3,7 @@ package com.specqq.chatbot.service.impl;
 import com.specqq.chatbot.adapter.ClientAdapter;
 import com.specqq.chatbot.adapter.ClientAdapterFactory;
 import com.specqq.chatbot.adapter.NapCatAdapter;
+import com.specqq.chatbot.constant.SyncConstants;
 import com.specqq.chatbot.dto.ApiCallResponseDTO;
 import com.specqq.chatbot.dto.BatchSyncResultDTO;
 import com.specqq.chatbot.dto.GroupSyncResultDTO;
@@ -293,7 +294,7 @@ public class GroupSyncServiceImpl implements GroupSyncService {
 
     @Override
     public List<GroupChat> getAlertGroups() {
-        List<GroupChat> alertGroups = groupChatMapper.selectFailedGroups(3);
+        List<GroupChat> alertGroups = groupChatMapper.selectFailedGroups(SyncConstants.ALERT_FAILURE_THRESHOLD);
         log.info("查询需要告警的群组: count={}", alertGroups.size());
         return alertGroups;
     }

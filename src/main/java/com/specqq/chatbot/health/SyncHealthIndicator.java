@@ -1,5 +1,6 @@
 package com.specqq.chatbot.health;
 
+import com.specqq.chatbot.constant.SyncConstants;
 import com.specqq.chatbot.service.MetricsService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,9 +30,6 @@ public class SyncHealthIndicator implements HealthIndicator {
 
     private final MetricsService metricsService;
 
-    private static final double HEALTHY_THRESHOLD = 0.90;
-    private static final double DEGRADED_THRESHOLD = 0.50;
-
     @Override
     public Health health() {
         try {
@@ -42,12 +40,12 @@ public class SyncHealthIndicator implements HealthIndicator {
             details.put("successRate", String.format("%.2f%%", successRate * 100));
             details.put("avgDurationMs", String.format("%.2f", avgDuration));
 
-            if (successRate >= HEALTHY_THRESHOLD) {
+            if (successRate >= SyncConstants.HEALTH_SUCCESS_RATE_HEALTHY) {
                 log.debug("Group sync health check: UP (success rate: {:.2f}%)", successRate * 100);
                 return Health.up()
                         .withDetails(details)
                         .build();
-            } else if (successRate >= DEGRADED_THRESHOLD) {
+            } else if (successRate >= SyncConstants.HEALTH_SUCCESS_RATE_DEGRADED) {
                 log.warn("Group sync health check: DEGRADED (success rate: {:.2f}%)", successRate * 100);
                 return Health.status("DEGRADED")
                         .withDetails(details)
