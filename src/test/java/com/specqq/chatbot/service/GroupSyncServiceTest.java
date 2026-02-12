@@ -12,6 +12,7 @@ import com.specqq.chatbot.enums.SyncStatus;
 import com.specqq.chatbot.mapper.ChatClientMapper;
 import com.specqq.chatbot.mapper.GroupChatMapper;
 import com.specqq.chatbot.service.impl.GroupSyncServiceImpl;
+import com.specqq.chatbot.service.MetricsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,6 +55,9 @@ class GroupSyncServiceTest {
     private ApplicationEventPublisher eventPublisher;
 
     @Mock
+    private MetricsService metricsService;
+
+    @Mock
     private NapCatAdapter napCatAdapter;
 
     private GroupSyncService groupSyncService;
@@ -68,7 +72,8 @@ class GroupSyncServiceTest {
             groupChatMapper,
             chatClientMapper,
             clientAdapterFactory,
-            eventPublisher
+            eventPublisher,
+            metricsService
         );
 
         // 初始化测试数据

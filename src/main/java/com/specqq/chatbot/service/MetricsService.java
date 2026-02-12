@@ -46,6 +46,12 @@ public class MetricsService {
     private final Counter messageProcessedCounter;
     private final Timer messageRoutingTimer;
 
+    // Group sync metrics (Feature 004)
+    private final Counter groupSyncSuccessCounter;
+    private final Counter groupSyncFailureCounter;
+    private final Timer groupSyncTimer;
+    private final Counter groupDiscoveryCounter;
+
     public MetricsService(MeterRegistry meterRegistry) {
         this.meterRegistry = meterRegistry;
 
@@ -116,6 +122,23 @@ public class MetricsService {
 
         this.messageRoutingTimer = Timer.builder("chatbot.message.routing_time")
                 .description("Total message routing time in milliseconds")
+                .register(meterRegistry);
+
+        // Initialize group sync metrics (Feature 004)
+        this.groupSyncSuccessCounter = Counter.builder("chatbot.group_sync.success")
+                .description("Number of successful group synchronizations")
+                .register(meterRegistry);
+
+        this.groupSyncFailureCounter = Counter.builder("chatbot.group_sync.failure")
+                .description("Number of failed group synchronizations")
+                .register(meterRegistry);
+
+        this.groupSyncTimer = Timer.builder("chatbot.group_sync.duration")
+                .description("Group synchronization duration in milliseconds")
+                .register(meterRegistry);
+
+        this.groupDiscoveryCounter = Counter.builder("chatbot.group_sync.discovered")
+                .description("Number of newly discovered groups")
                 .register(meterRegistry);
 
         log.info("MetricsService initialized with Prometheus metrics");
@@ -333,5 +356,86 @@ public class MetricsService {
      */
     public double getAverageMessageRoutingTime() {
         return messageRoutingTimer.mean(TimeUnit.MILLISECONDS);
+    }
+
+    // ==================== Group Sync Metrics (Feature 004) ====================
+
+    /**
+     * Record group sync success
+     *
+     * @param groupId Group ID
+     */
+    public void recordGroupSyncSuccess(String groupId) {
+        Counter.builder("chatbot.group_sync.success")
+                .tag("group_id", groupId)
+                .register(meterRegistry)
+                .increment();
+
+        groupSyncSuccessCounter.increment();
+    }
+
+    /**
+     * Record group sync failure
+     *
+     * @param groupId Group ID
+     * @param reason  Failure reason
+     */
+    public void recordGroupSyncFailure(String groupId, String reason) {
+        Counter.builder("chatbot.group_sync.failure")
+                .tag("group_id", groupId)
+                .tag("reason", reason)
+                .register(meterRegistry)
+                .increment();
+
+        groupSyncFailureCounter.increment();
+    }
+
+    /**
+     * Record group sync duration
+     *
+     * @param duration Sync duration
+     */
+    public void recordGroupSyncDuration(Duration duration) {
+        groupSyncTimer.record(duration);
+    }
+
+    /**
+     * Record group sync duration in milliseconds
+     *
+     * @param durationMs Sync duration in milliseconds
+     */
+    public void recordGroupSyncDuration(long durationMs) {
+        groupSyncTimer.record(durationMs, TimeUnit.MILLISECONDS);
+    }
+
+    /**
+     * Record newly discovered groups
+     *
+     * @param count Number of discovered groups
+     */
+    public void recordGroupDiscovery(int count) {
+        groupDiscoveryCounter.increment(count);
+    }
+
+    /**
+     * Get group sync success rate
+     *
+     * @return Success rate (0.0 to 1.0)
+     */
+    public double getGroupSyncSuccessRate() {
+        double successCount = groupSyncSuccessCounter.count();
+        double failureCount = groupSyncFailureCounter.count();
+        double total = successCount + failureCount;
+
+        return total > 0 ? successCount / total : 0.0;
+    }
+
+    /**
+     * Get average group sync duration
+     *
+     * @return Average sync duration in milliseconds
+     */
+    public double getAverageGroupSyncDuration() {
+        return groupSyncTimer.mean(TimeUnit.MILLISECONDS);
     }
 }

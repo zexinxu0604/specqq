@@ -13,6 +13,7 @@ import com.specqq.chatbot.mapper.ChatClientMapper;
 import com.specqq.chatbot.mapper.GroupChatMapper;
 import com.specqq.chatbot.event.GroupDiscoveryEvent;
 import com.specqq.chatbot.service.GroupSyncService;
+import com.specqq.chatbot.service.MetricsService;
 import io.github.resilience4j.retry.annotation.Retry;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +43,7 @@ public class GroupSyncServiceImpl implements GroupSyncService {
     private final ChatClientMapper chatClientMapper;
     private final ClientAdapterFactory clientAdapterFactory;
     private final ApplicationEventPublisher eventPublisher;
+    private final MetricsService metricsService;
 
     @Override
     @Retry(name = "groupSync", fallbackMethod = "syncGroupFallback")
@@ -80,6 +82,11 @@ public class GroupSyncServiceImpl implements GroupSyncService {
                 groupChatMapper.updateById(groupChat);
 
                 log.warn("群组同步失败: groupId={}, reason={}", groupChat.getGroupId(), reason);
+
+                // Record failure metric
+                metricsService.recordGroupSyncFailure(groupChat.getGroupId(),
+                    response == null ? "bot_removed" : "api_error");
+
                 return GroupSyncResultDTO.failure(groupChat.getId(), groupChat.getGroupName(), reason, false);
             }
 
@@ -105,6 +112,10 @@ public class GroupSyncServiceImpl implements GroupSyncService {
 
             log.info("群组同步成功: groupId={}, groupName={}, memberCount={}",
                     groupChat.getGroupId(), groupName, memberCount);
+
+            // Record success metric
+            metricsService.recordGroupSyncSuccess(groupChat.getGroupId());
+
             return GroupSyncResultDTO.success(groupChat.getId(), groupChat.getGroupName(), memberCount);
 
         } catch (Exception e) {
@@ -112,6 +123,10 @@ public class GroupSyncServiceImpl implements GroupSyncService {
                     groupChat.getGroupId(), groupChat.getGroupName(), e);
             groupChat.markSyncFailure("同步异常: " + e.getMessage());
             groupChatMapper.updateById(groupChat);
+
+            // Record failure metric
+            metricsService.recordGroupSyncFailure(groupChat.getGroupId(), "exception");
+
             return GroupSyncResultDTO.failure(groupChat.getId(), groupChat.getGroupName(),
                     "同步异常: " + e.getMessage(), true);
         }
@@ -149,6 +164,9 @@ public class GroupSyncServiceImpl implements GroupSyncService {
         log.debug("批量同步详细结果: successRate={}%, results={}",
             String.format("%.2f", batchResult.getSuccessRate()),
             results.stream().map(r -> String.format("%s:%s", r.groupName(), r.syncStatus())).collect(Collectors.toList()));
+
+        // Record batch sync duration metric
+        metricsService.recordGroupSyncDuration(batchResult.durationMs());
 
         return batchResult;
     }
@@ -241,6 +259,9 @@ public class GroupSyncServiceImpl implements GroupSyncService {
                 GroupDiscoveryEvent event = new GroupDiscoveryEvent(this, newGroups, clientId);
                 eventPublisher.publishEvent(event);
                 log.info("发布群组发现事件: clientId={}, newGroupCount={}", clientId, newGroups.size());
+
+                // Record group discovery metric
+                metricsService.recordGroupDiscovery(newGroups.size());
             }
 
             log.info("自动发现完成: clientId={}, newGroups={}", clientId, newGroups.size());
