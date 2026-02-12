@@ -52,11 +52,13 @@ public class MyBatisPlusConfig {
             public void insertFill(MetaObject metaObject) {
                 LocalDateTime now = LocalDateTime.now();
 
-                // 自动填充created_at字段
+                // 自动填充created_at字段 (支持createdAt和createTime两种命名)
                 this.strictInsertFill(metaObject, "createdAt", LocalDateTime.class, now);
+                this.strictInsertFill(metaObject, "createTime", LocalDateTime.class, now);
 
-                // 自动填充updated_at字段
+                // 自动填充updated_at字段 (支持updatedAt和updateTime两种命名)
                 this.strictInsertFill(metaObject, "updatedAt", LocalDateTime.class, now);
+                this.strictInsertFill(metaObject, "updateTime", LocalDateTime.class, now);
 
                 // 自动填充timestamp字段(MessageLog)
                 this.strictInsertFill(metaObject, "timestamp", LocalDateTime.class, now);
@@ -64,8 +66,11 @@ public class MyBatisPlusConfig {
 
             @Override
             public void updateFill(MetaObject metaObject) {
-                // 自动填充updated_at字段
-                this.strictUpdateFill(metaObject, "updatedAt", LocalDateTime.class, LocalDateTime.now());
+                LocalDateTime now = LocalDateTime.now();
+
+                // 自动填充updated_at字段 (支持updatedAt和updateTime两种命名)
+                this.strictUpdateFill(metaObject, "updatedAt", LocalDateTime.class, now);
+                this.strictUpdateFill(metaObject, "updateTime", LocalDateTime.class, now);
             }
         };
     }

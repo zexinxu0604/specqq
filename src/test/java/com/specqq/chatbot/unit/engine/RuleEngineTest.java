@@ -53,6 +53,21 @@ class RuleEngineTest {
     @Mock
     private StatisticsMatcher statisticsMatcher;
 
+    @Mock
+    private com.specqq.chatbot.service.PolicyService policyService;
+
+    @Mock
+    private com.specqq.chatbot.engine.policy.PolicyChain policyChain;
+
+    @Mock
+    private PrefixMatcher prefixMatcher;
+
+    @Mock
+    private SuffixMatcher suffixMatcher;
+
+    @Mock
+    private com.specqq.chatbot.adapter.NapCatAdapter napCatAdapter;
+
     @InjectMocks
     private RuleEngine ruleEngine;
 
@@ -81,7 +96,7 @@ class RuleEngineTest {
         highPriorityRule.setPattern("help");
         highPriorityRule.setPriority(90);
         highPriorityRule.setEnabled(true);
-        highPriorityRule.setCreatedAt(LocalDateTime.now().minusDays(2));
+        highPriorityRule.setCreateTime(LocalDateTime.now().minusDays(2));
 
         // 创建低优先级规则
         lowPriorityRule = new MessageRule();
@@ -91,7 +106,7 @@ class RuleEngineTest {
         lowPriorityRule.setPattern("help");
         lowPriorityRule.setPriority(50);
         lowPriorityRule.setEnabled(true);
-        lowPriorityRule.setCreatedAt(LocalDateTime.now().minusDays(1));
+        lowPriorityRule.setCreateTime(LocalDateTime.now().minusDays(1));
 
         // 创建测试消息
         testMessage = MessageReceiveDTO.builder()
@@ -134,7 +149,7 @@ class RuleEngineTest {
         earlierRule.setMatchType(MessageRule.MatchType.EXACT);
         earlierRule.setPattern("test");
         earlierRule.setPriority(50);
-        earlierRule.setCreatedAt(LocalDateTime.now().minusDays(10));
+        earlierRule.setCreateTime(LocalDateTime.now().minusDays(10));
 
         MessageRule laterRule = new MessageRule();
         laterRule.setId(4L);
@@ -142,7 +157,7 @@ class RuleEngineTest {
         laterRule.setMatchType(MessageRule.MatchType.EXACT);
         laterRule.setPattern("test");
         laterRule.setPriority(50);
-        laterRule.setCreatedAt(LocalDateTime.now().minusDays(1));
+        laterRule.setCreateTime(LocalDateTime.now().minusDays(1));
 
         List<MessageRule> rules = Arrays.asList(earlierRule, laterRule);
 
@@ -331,7 +346,9 @@ class RuleEngineTest {
     void testException_UnknownMatchType() {
         // 创建一个规则，但不初始化匹配器映射
         RuleEngine engineWithoutInit = new RuleEngine(
-            ruleService, groupService, exactMatcher, containsMatcher, regexMatcher, statisticsMatcher
+            ruleService, groupService, policyService, policyChain,
+            exactMatcher, containsMatcher, regexMatcher, prefixMatcher, suffixMatcher, statisticsMatcher,
+            napCatAdapter
         );
         // 不调用init()
 

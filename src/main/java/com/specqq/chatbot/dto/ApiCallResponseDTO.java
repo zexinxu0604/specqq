@@ -63,6 +63,12 @@ public class ApiCallResponseDTO {
     private String id;
 
     /**
+     * Echo field (NapCat uses this instead of id for WebSocket responses)
+     */
+    @JsonProperty("echo")
+    private String echo;
+
+    /**
      * Default constructor
      */
     public ApiCallResponseDTO() {
@@ -156,11 +162,20 @@ public class ApiCallResponseDTO {
     }
 
     public String getId() {
-        return id;
+        // Return echo if id is null (NapCat uses echo field)
+        return id != null ? id : echo;
     }
 
     public void setId(String id) {
         this.id = id;
+    }
+
+    public String getEcho() {
+        return echo;
+    }
+
+    public void setEcho(String echo) {
+        this.echo = echo;
     }
 
     @Override

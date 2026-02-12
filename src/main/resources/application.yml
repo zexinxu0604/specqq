@@ -3,6 +3,8 @@ spring:
     name: chatbot-router
   profiles:
     active: dev
+  main:
+    allow-circular-references: true
 
 server:
   port: 8080

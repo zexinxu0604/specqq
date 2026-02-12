@@ -50,7 +50,7 @@ class NapCatApiIntegrationTest {
         params.put("group_id", 123456L);
 
         // When: Calling API (will fail with real NapCat but tests structure)
-        CompletableFuture<ApiCallResponseDTO> future = napCatAdapter.callApi(action, params);
+        CompletableFuture<ApiCallResponseDTO> future = napCatAdapter.callApiWithFallback(action, params);
 
         // Then: Should return CompletableFuture (structure test only)
         assertThat(future).isNotNull();
@@ -71,7 +71,7 @@ class NapCatApiIntegrationTest {
         params.put("group_id", 123456L);
 
         // When: Calling API
-        CompletableFuture<ApiCallResponseDTO> future = napCatAdapter.callApi(action, params);
+        CompletableFuture<ApiCallResponseDTO> future = napCatAdapter.callApiWithFallback(action, params);
 
         // Then: Should complete within timeout period
         // Note: Without a real NapCat server, the HTTP client will fail fast (connection refused)
