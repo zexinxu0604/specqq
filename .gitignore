@@ -93,6 +93,30 @@ NAPCAT_*.md
 *_TODOS_*.md
 *_OPTIMIZATION_*.md
 
+# Temporary fix and bug reports (exclude from git)
+*_FIX*.md
+*_REPORT.md
+*_SUMMARY.md
+BUG_*.md
+POLICY_*.md
+HANDLER_*.md
+VALIDATION_*.md
+CONDITIONAL_*.md
+V_MODEL_*.md
+TIME_*.md
+TIMEWINDOW_*.md
+GLOBAL_*.md
+EMPTY_*.md
+MERGE_*.md
+GIT_*.md
+
+# Keep important docs (exceptions to above rules)
+!README.md
+!CLAUDE.md
+!DEPLOYMENT_GUIDE.md
+!README_TESTING.md
+!LAUNCH_CHECKLIST.md
+
 # Specs and planning documents
 specs/
 
