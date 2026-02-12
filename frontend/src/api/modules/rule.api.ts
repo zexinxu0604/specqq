@@ -80,9 +80,9 @@ export function copyRule(id: number) {
 /**
  * 验证正则表达式
  */
-export function validatePattern(pattern: string) {
+export function validatePattern(matchType: string, pattern: string) {
   return post<ValidatePatternResponse>('/api/rules/validate-pattern', null, {
-    params: { pattern }
+    params: { matchType, pattern }
   })
 }
 

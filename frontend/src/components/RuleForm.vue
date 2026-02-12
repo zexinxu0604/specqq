@@ -63,7 +63,8 @@
     </el-form-item>
 
     <!-- CQ Code Pattern Selector (only for REGEX type) -->
-    <el-form-item v-if="formData.matchType === MatchType.REGEX" label="CQ码模式">
+    <!-- Temporarily hidden until backend CQCode API is implemented -->
+    <el-form-item v-if="false && formData.matchType === MatchType.REGEX" label="CQ码模式">
       <el-row :gutter="16">
         <el-col :span="12">
           <CQCodeSelector
@@ -368,7 +369,7 @@ const validatePattern = async () => {
 
   validating.value = true
   try {
-    const response = await validatePatternApi(formData.pattern)
+    const response = await validatePatternApi(formData.matchType, formData.pattern)
     patternValidation.value = response.data
     if (response.data.valid) {
       ElMessage.success('正则表达式验证通过')
