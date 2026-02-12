@@ -393,7 +393,7 @@ public class RuleController {
      */
     @PostMapping("/validate-pattern")
     @Operation(summary = "验证匹配模式", description = "验证正则表达式或匹配模式是否有效")
-    public Result<Boolean> validatePattern(
+    public Result<com.specqq.chatbot.dto.ValidatePatternResponseDTO> validatePattern(
         @Parameter(description = "匹配类型") @RequestParam MessageRule.MatchType matchType,
         @Parameter(description = "匹配模式") @RequestParam String pattern
     ) {
@@ -402,11 +402,15 @@ public class RuleController {
         if (MessageRule.MatchType.REGEX.equals(matchType)) {
             boolean valid = ruleService.validateRegexPattern(pattern);
             if (!valid) {
-                return Result.error(ResultCode.RULE_PATTERN_INVALID, "正则表达式语法错误");
+                return Result.success(
+                    com.specqq.chatbot.dto.ValidatePatternResponseDTO.error("✗ 正则表达式语法错误")
+                );
             }
         }
 
-        return Result.success("匹配模式有效", true);
+        return Result.success(
+            com.specqq.chatbot.dto.ValidatePatternResponseDTO.success("✓ 正则表达式语法正确")
+        );
     }
 
     /**
