@@ -157,18 +157,22 @@ public class NapCatWebSocketHandler extends TextWebSocketHandler {
      */
     private void handleApiResponse(String payload) {
         try {
+            log.debug("Parsing API response: {}", payload);
             ApiCallResponseDTO response = objectMapper.readValue(payload, ApiCallResponseDTO.class);
+            log.debug("Parsed response: id={}, echo={}, retcode={}",
+                response.getId(), response.getEcho(), response.getRetcode());
 
             if (napCatAdapter != null && response.getId() != null) {
                 log.debug("Routing API response to NapCatAdapter: requestId={}, retcode={}",
                     response.getId(), response.getRetcode());
                 napCatAdapter.handleWebSocketResponse(response.getId(), response);
             } else {
-                log.debug("API response received but no handler: requestId={}", response.getId());
+                log.warn("API response received but no handler: napCatAdapter={}, requestId={}",
+                    napCatAdapter != null, response.getId());
             }
 
         } catch (Exception e) {
-            log.error("Failed to parse API response", e);
+            log.error("Failed to parse API response: {}", payload, e);
         }
     }
 

@@ -1,5 +1,6 @@
 package com.specqq.chatbot.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.Map;
@@ -83,7 +84,7 @@ public class ApiCallResponseDTO {
     public ApiCallResponseDTO(Map<String, Object> data, Long executionTimeMs) {
         this.status = "ok";
         this.retcode = 0;
-        this.data = data;
+        this.rawData = data;
         this.executionTimeMs = executionTimeMs;
     }
 
@@ -145,14 +146,17 @@ public class ApiCallResponseDTO {
         return null;
     }
 
-    public void setData(Map<String, Object> data) {
+    @JsonProperty("data")
+    public void setData(Object data) {
         this.rawData = data;
     }
 
+    @JsonIgnore
     public Object getRawData() {
         return rawData;
     }
 
+    @JsonIgnore
     public void setRawData(Object rawData) {
         this.rawData = rawData;
     }
@@ -193,6 +197,6 @@ public class ApiCallResponseDTO {
     @Override
     public String toString() {
         return String.format("ApiCallResponseDTO{status='%s', retcode=%d, data=%s, message='%s', executionTimeMs=%d, id='%s'}",
-                status, retcode, data, message, executionTimeMs, id);
+                status, retcode, rawData, message, executionTimeMs, id);
     }
 }

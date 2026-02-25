@@ -13,6 +13,11 @@ export interface GroupConfig {
 }
 
 /**
+ * 同步状态
+ */
+export type SyncStatus = 'SUCCESS' | 'FAILED' | 'PENDING'
+
+/**
  * 群聊实体
  */
 export interface GroupChat {
@@ -20,8 +25,15 @@ export interface GroupChat {
   clientId: number
   groupId: string
   groupName: string
+  memberCount: number
   enabled: boolean
+  active: boolean
   config: GroupConfig
+  syncStatus?: SyncStatus
+  lastSyncTime?: string
+  lastFailureTime?: string
+  failureReason?: string
+  consecutiveFailureCount: number
   createdAt: string
   updatedAt: string
 }

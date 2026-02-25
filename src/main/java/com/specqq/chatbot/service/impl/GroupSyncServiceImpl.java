@@ -92,10 +92,18 @@ public class GroupSyncServiceImpl implements GroupSyncService {
             }
 
             // 解析群组信息
+            Object rawData = response.getRawData();
+            log.debug("API响应原始数据: rawDataType={}, rawData={}",
+                rawData != null ? rawData.getClass().getName() : "null", rawData);
+
             Map<String, Object> data = response.getData();
+            if (data == null) {
+                log.error("无法解析API响应数据: rawData={}", rawData);
+                throw new IllegalStateException("API响应数据格式错误");
+            }
             String groupName = (String) data.get("group_name");
             Integer memberCount = getIntValue(data, "member_count");
-            log.debug("解析群组信息: groupName={}, memberCount={}", groupName, memberCount);
+            log.info("解析群组信息: groupName={}, memberCount={}", groupName, memberCount);
 
             // 更新群组信息
             if (groupName != null) {
@@ -191,28 +199,41 @@ public class GroupSyncServiceImpl implements GroupSyncService {
     @Override
     @Transactional
     public Integer discoverNewGroups(Long clientId) {
-        log.info("开始自动发现新群组: clientId={}", clientId);
+        long startTime = System.currentTimeMillis();
+        log.info("[性能分析] 开始自动发现新群组: clientId={}", clientId);
 
         try {
+            long step1Start = System.currentTimeMillis();
             ChatClient client = getChatClient(clientId);
+            log.info("[性能分析] Step 1 - 获取客户端信息: {}ms", System.currentTimeMillis() - step1Start);
+
             if (client == null) {
                 return 0;
             }
 
+            long step2Start = System.currentTimeMillis();
             List<Map<String, Object>> groupList = fetchGroupListFromAdapter(client, clientId);
+            log.info("[性能分析] Step 2 - 从适配器获取群组列表: {}ms", System.currentTimeMillis() - step2Start);
+
             if (groupList == null || groupList.isEmpty()) {
                 return 0;
             }
 
+            long step3Start = System.currentTimeMillis();
             List<GroupChat> newGroups = processAndSaveNewGroups(groupList, clientId);
+            log.info("[性能分析] Step 3 - 处理并保存新群组: {}ms", System.currentTimeMillis() - step3Start);
 
+            long step4Start = System.currentTimeMillis();
             publishGroupDiscoveryEvent(newGroups, clientId);
+            log.info("[性能分析] Step 4 - 发布发现事件: {}ms", System.currentTimeMillis() - step4Start);
 
-            log.info("自动发现完成: clientId={}, newGroups={}", clientId, newGroups.size());
+            long totalTime = System.currentTimeMillis() - startTime;
+            log.info("[性能分析] 自动发现完成: clientId={}, newGroups={}, totalTime={}ms", clientId, newGroups.size(), totalTime);
             return newGroups.size();
 
         } catch (Exception e) {
-            log.error("自动发现新群组失败: clientId={}", clientId, e);
+            long totalTime = System.currentTimeMillis() - startTime;
+            log.error("[性能分析] 自动发现新群组失败: clientId={}, totalTime={}ms", clientId, totalTime, e);
             return 0;
         }
     }
@@ -239,8 +260,13 @@ public class GroupSyncServiceImpl implements GroupSyncService {
         }
 
         log.debug("调用NapCat API获取群组列表");
+        long apiStartTime = System.currentTimeMillis();
         CompletableFuture<ApiCallResponseDTO> future = napCatAdapter.getGroupList();
         ApiCallResponseDTO response = future.join();
+        long apiDuration = System.currentTimeMillis() - apiStartTime;
+
+        log.info("[性能分析] NapCat API getGroupList 调用耗时: {}ms, retcode={}",
+                apiDuration, response != null ? response.getRetcode() : "null");
 
         if (response == null || response.getRetcode() != 0) {
             log.error("获取群组列表失败: clientId={}, retcode={}",

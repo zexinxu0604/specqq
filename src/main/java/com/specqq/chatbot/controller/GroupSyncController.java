@@ -2,7 +2,9 @@ package com.specqq.chatbot.controller;
 
 import com.specqq.chatbot.common.Result;
 import com.specqq.chatbot.dto.BatchSyncResultDTO;
+import com.specqq.chatbot.dto.GroupSyncResultDTO;
 import com.specqq.chatbot.entity.GroupChat;
+import com.specqq.chatbot.mapper.GroupChatMapper;
 import com.specqq.chatbot.scheduler.GroupSyncScheduler;
 import com.specqq.chatbot.service.GroupSyncService;
 import com.specqq.chatbot.vo.BatchSyncVO;
@@ -38,6 +40,7 @@ public class GroupSyncController {
 
     private final GroupSyncService groupSyncService;
     private final GroupSyncScheduler groupSyncScheduler;
+    private final GroupChatMapper groupChatMapper;
 
     @PostMapping("/trigger")
     @PreAuthorize("hasRole('ADMIN')")
@@ -66,8 +69,25 @@ public class GroupSyncController {
             @Parameter(description = "群组ID")
             @PathVariable @NotNull(message = "群组ID不能为空") @Min(value = 1, message = "群组ID必须大于0") Long groupId) {
         log.info("手动同步单个群组: groupId={}", groupId);
-        // TODO: 需要先查询群组实体
-        return Result.error("功能开发中");
+
+        // 查询群组实体
+        GroupChat groupChat = groupChatMapper.selectById(groupId);
+        if (groupChat == null) {
+            log.warn("群组不存在: groupId={}", groupId);
+            return Result.error("群组不存在");
+        }
+
+        // 执行同步
+        GroupSyncResultDTO result = groupSyncService.syncGroup(groupChat);
+
+        // 返回同步结果
+        GroupSyncVO vo = GroupSyncVO.from(result);
+        if (result.isSuccess()) {
+            return Result.success("同步成功", vo);
+        } else {
+            String errorMsg = result.failureReason() != null ? result.failureReason() : "同步失败";
+            return Result.error(500, errorMsg, vo);
+        }
     }
 
     @GetMapping("/alert")

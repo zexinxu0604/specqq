@@ -63,6 +63,9 @@ export interface LogQueryParams {
   startTime?: string
   endTime?: string
   keyword?: string
+  userKeyword?: string       // 用户昵称/ID筛选
+  messageKeyword?: string    // 消息内容关键词筛选
+  errorType?: string         // 错误类型筛选
 }
 
 /**

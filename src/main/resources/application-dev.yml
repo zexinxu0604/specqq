@@ -65,7 +65,7 @@ caffeine:
 napcat:
   http:
     url: ${NAPCAT_HTTP_URL:http://127.0.0.1:3000}
-    access-token: ${NAPCAT_HTTP_TOKEN:pDcIldXJcsTlEYxy}
+    access-token: ${NAPCAT_HTTP_TOKEN:}
     connection-pool:
       max-total: 50
       max-per-route: 20

@@ -351,6 +351,22 @@ public class GroupService extends ServiceImpl<GroupChatMapper, GroupChat> {
     public Map<String, Object> getGroupStats(Long groupId, String startTime, String endTime) {
         Map<String, Object> stats = new HashMap<>();
 
+        // 获取群聊信息，以获取平台群号
+        GroupChat group = groupChatMapper.selectById(groupId);
+        if (group == null) {
+            log.warn("Group not found for stats: groupId={}", groupId);
+            stats.put("totalMessages", 0L);
+            stats.put("successReplies", 0L);
+            stats.put("failedReplies", 0L);
+            stats.put("skippedReplies", 0L);
+            stats.put("startTime", startTime != null ? startTime : LocalDateTime.now().minusDays(7));
+            stats.put("endTime", endTime != null ? endTime : LocalDateTime.now());
+            return stats;
+        }
+
+        // message_log 表中的 group_id 存储的是平台群号（如QQ群号），不是数据库自增ID
+        Long platformGroupId = Long.parseLong(group.getGroupId());
+
         // 解析时间范围
         LocalDateTime start = startTime != null ?
             LocalDateTime.parse(startTime, DateTimeFormatter.ISO_DATE_TIME) :
@@ -362,27 +378,27 @@ public class GroupService extends ServiceImpl<GroupChatMapper, GroupChat> {
 
         // 查询总消息数
         LambdaQueryWrapper<MessageLog> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(MessageLog::getGroupId, groupId);
+        wrapper.eq(MessageLog::getGroupId, platformGroupId);
         wrapper.between(MessageLog::getTimestamp, start, end);
         Long totalMessages = messageLogMapper.selectCount(wrapper);
 
         // 查询成功回复数
         LambdaQueryWrapper<MessageLog> successWrapper = new LambdaQueryWrapper<>();
-        successWrapper.eq(MessageLog::getGroupId, groupId);
+        successWrapper.eq(MessageLog::getGroupId, platformGroupId);
         successWrapper.eq(MessageLog::getSendStatus, MessageLog.SendStatus.SUCCESS);
         successWrapper.between(MessageLog::getTimestamp, start, end);
         Long successReplies = messageLogMapper.selectCount(successWrapper);
 
         // 查询失败回复数
         LambdaQueryWrapper<MessageLog> failedWrapper = new LambdaQueryWrapper<>();
-        failedWrapper.eq(MessageLog::getGroupId, groupId);
+        failedWrapper.eq(MessageLog::getGroupId, platformGroupId);
         failedWrapper.eq(MessageLog::getSendStatus, MessageLog.SendStatus.FAILED);
         failedWrapper.between(MessageLog::getTimestamp, start, end);
         Long failedReplies = messageLogMapper.selectCount(failedWrapper);
 
         // 查询跳过回复数（频率限制）
         LambdaQueryWrapper<MessageLog> skippedWrapper = new LambdaQueryWrapper<>();
-        skippedWrapper.eq(MessageLog::getGroupId, groupId);
+        skippedWrapper.eq(MessageLog::getGroupId, platformGroupId);
         skippedWrapper.eq(MessageLog::getSendStatus, MessageLog.SendStatus.SKIPPED);
         skippedWrapper.between(MessageLog::getTimestamp, start, end);
         Long skippedReplies = messageLogMapper.selectCount(skippedWrapper);

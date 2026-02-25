@@ -7,6 +7,8 @@ import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.specqq.chatbot.adapter.NapCatAdapter;
 import com.specqq.chatbot.dto.ApiCallResponseDTO;
 import com.specqq.chatbot.entity.MessageLog;
+import com.specqq.chatbot.entity.GroupChat;
+import com.specqq.chatbot.mapper.GroupChatMapper;
 import com.specqq.chatbot.mapper.MessageLogMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +43,7 @@ import java.util.stream.Collectors;
 public class MessageLogService extends ServiceImpl<MessageLogMapper, MessageLog> {
 
     private final MessageLogMapper messageLogMapper;
+    private final GroupChatMapper groupChatMapper;
     private final NapCatAdapter napCatAdapter;
 
     // 批量插入缓冲区
@@ -188,25 +191,38 @@ public class MessageLogService extends ServiceImpl<MessageLogMapper, MessageLog>
     /**
      * 分页查询日志（支持多条件筛选）
      *
-     * @param page       页码
-     * @param size       每页数量
-     * @param groupId    群聊ID
-     * @param userId     用户ID
-     * @param ruleId     规则ID
-     * @param sendStatus 发送状态
-     * @param startTime  开始时间
-     * @param endTime    结束时间
-     * @param keyword    关键词（消息内容）
+     * @param page           页码
+     * @param size           每页数量
+     * @param groupId        群聊ID
+     * @param userId         用户ID
+     * @param ruleId         规则ID
+     * @param sendStatus     发送状态
+     * @param startTime      开始时间
+     * @param endTime        结束时间
+     * @param keyword        关键词（消息内容）
+     * @param userKeyword    用户关键词（昵称或ID模糊查询）
+     * @param messageKeyword 消息内容关键词
+     * @param errorType      错误类型
      * @return 分页结果
      */
     public Page<MessageLog> listLogs(Integer page, Integer size, Long groupId, String userId,
                                      Long ruleId, String sendStatus, LocalDateTime startTime,
-                                     LocalDateTime endTime, String keyword) {
+                                     LocalDateTime endTime, String keyword,
+                                     String userKeyword, String messageKeyword, String errorType) {
         Page<MessageLog> pageParam = new Page<>(page, size);
         LambdaQueryWrapper<MessageLog> wrapper = new LambdaQueryWrapper<>();
 
         if (groupId != null) {
-            wrapper.eq(MessageLog::getGroupId, groupId);
+            // 获取群聊信息，以获取平台群号
+            GroupChat group = groupChatMapper.selectById(groupId);
+            if (group != null) {
+                // message_log 表中的 group_id 存储的是平台群号（如QQ群号），不是数据库自增ID
+                Long platformGroupId = Long.parseLong(group.getGroupId());
+                wrapper.eq(MessageLog::getGroupId, platformGroupId);
+            } else {
+                // 群聊不存在，返回空结果
+                wrapper.eq(MessageLog::getGroupId, -1L);
+            }
         }
 
         if (userId != null && !userId.trim().isEmpty()) {
@@ -236,6 +252,34 @@ public class MessageLogService extends ServiceImpl<MessageLogMapper, MessageLog>
 
         if (keyword != null && !keyword.trim().isEmpty()) {
             wrapper.like(MessageLog::getMessageContent, keyword);
+        }
+
+        // 用户关键词筛选（昵称或ID模糊查询）
+        if (userKeyword != null && !userKeyword.trim().isEmpty()) {
+            wrapper.and(w -> w.like(MessageLog::getUserId, userKeyword)
+                .or()
+                .like(MessageLog::getUserNickname, userKeyword));
+        }
+
+        // 消息内容关键词筛选
+        if (messageKeyword != null && !messageKeyword.trim().isEmpty()) {
+            wrapper.like(MessageLog::getMessageContent, messageKeyword);
+        }
+
+        // 错误类型筛选
+        if (errorType != null && !errorType.trim().isEmpty()) {
+            if ("other".equals(errorType)) {
+                // 其他错误：不匹配已知错误类型的错误
+                wrapper.and(w -> w.notLike(MessageLog::getErrorMessage, "no matching rule")
+                    .notLike(MessageLog::getErrorMessage, "routing timeout")
+                    .notLike(MessageLog::getErrorMessage, "timeout")
+                    .notLike(MessageLog::getErrorMessage, "connection")
+                    .notLike(MessageLog::getErrorMessage, "permission")
+                    .notLike(MessageLog::getErrorMessage, "rate limit"));
+            } else {
+                // 特定错误类型匹配
+                wrapper.like(MessageLog::getErrorMessage, errorType);
+            }
         }
 
         wrapper.orderByDesc(MessageLog::getTimestamp);

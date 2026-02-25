@@ -1,5 +1,6 @@
 package com.specqq.chatbot.vo;
 
+import com.specqq.chatbot.dto.GroupSyncResultDTO;
 import com.specqq.chatbot.entity.GroupChat;
 import com.specqq.chatbot.enums.SyncStatus;
 import lombok.Builder;
@@ -46,6 +47,24 @@ public record GroupSyncVO(
                 .lastFailureTime(groupChat.getLastFailureTime())
                 .failureReason(groupChat.getFailureReason())
                 .consecutiveFailureCount(groupChat.getConsecutiveFailureCount())
+                .build();
+    }
+
+    /**
+     * 从 GroupSyncResultDTO 转换为 VO
+     *
+     * @param result 同步结果 DTO
+     * @return 群组同步状态 VO
+     */
+    public static GroupSyncVO from(GroupSyncResultDTO result) {
+        return GroupSyncVO.builder()
+                .groupId(String.valueOf(result.groupId()))
+                .groupName(result.groupName())
+                .memberCount(result.memberCount())
+                .active(result.active())
+                .syncStatus(result.syncStatus())
+                .lastSyncTime(result.syncTime())
+                .failureReason(result.failureReason())
                 .build();
     }
 

@@ -51,13 +51,17 @@ public class LogController {
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime startTime,
         @Parameter(description = "结束时间（ISO 8601格式）") @RequestParam(required = false)
         @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime endTime,
-        @Parameter(description = "消息内容（模糊查询）") @RequestParam(required = false) String keyword
+        @Parameter(description = "消息内容（模糊查询）") @RequestParam(required = false) String keyword,
+        @Parameter(description = "用户关键词（昵称或ID模糊查询）") @RequestParam(required = false) String userKeyword,
+        @Parameter(description = "消息内容关键词") @RequestParam(required = false) String messageKeyword,
+        @Parameter(description = "错误类型") @RequestParam(required = false) String errorType
     ) {
-        log.info("查询日志列表: page={}, size={}, groupId={}, userId={}, sendStatus={}, startTime={}, endTime={}",
-            page, size, groupId, userId, sendStatus, startTime, endTime);
+        log.info("查询日志列表: page={}, size={}, groupId={}, userId={}, sendStatus={}, startTime={}, endTime={}, userKeyword={}, messageKeyword={}, errorType={}",
+            page, size, groupId, userId, sendStatus, startTime, endTime, userKeyword, messageKeyword, errorType);
 
         Page<MessageLog> result = messageLogService.listLogs(
-            page, size, groupId, userId, ruleId, sendStatus, startTime, endTime, keyword);
+            page, size, groupId, userId, ruleId, sendStatus, startTime, endTime, keyword,
+            userKeyword, messageKeyword, errorType);
         return Result.success(result);
     }
 

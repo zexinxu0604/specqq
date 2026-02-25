@@ -23,7 +23,8 @@ export const useGroupSyncStore = defineStore('groupSync', () => {
 
     syncInProgress.value = true
     try {
-      const result = await groupSyncApi.triggerSync()
+      const response = await groupSyncApi.triggerSync()
+      const result = response.data
       lastSyncResult.value = result
       syncHistory.value.unshift(result)
 
@@ -48,7 +49,8 @@ export const useGroupSyncStore = defineStore('groupSync', () => {
 
     syncInProgress.value = true
     try {
-      const result = await groupSyncApi.retryFailedGroups(minFailureCount)
+      const response = await groupSyncApi.retryFailedGroups(minFailureCount)
+      const result = response.data
       lastSyncResult.value = result
       syncHistory.value.unshift(result)
 
@@ -65,12 +67,13 @@ export const useGroupSyncStore = defineStore('groupSync', () => {
   }
 
   async function syncSingleGroup(groupId: number) {
-    const result = await groupSyncApi.syncGroup(groupId)
-    return result
+    const response = await groupSyncApi.syncGroup(groupId)
+    return response.data
   }
 
   async function fetchAlertGroups() {
-    alertGroups.value = await groupSyncApi.getAlertGroups()
+    const response = await groupSyncApi.getAlertGroups()
+    alertGroups.value = response.data
   }
 
   async function resetFailureCount(groupId: number) {
@@ -79,8 +82,8 @@ export const useGroupSyncStore = defineStore('groupSync', () => {
   }
 
   async function discoverNewGroups(clientId: number) {
-    const count = await groupSyncApi.discoverNewGroups(clientId)
-    return count
+    const response = await groupSyncApi.discoverNewGroups(clientId)
+    return response.data
   }
 
   // Initialize

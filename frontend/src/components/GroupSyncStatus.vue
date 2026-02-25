@@ -119,6 +119,10 @@ import { useGroupSyncStore } from '@/stores/groupSync'
 import { formatDistanceToNow } from 'date-fns'
 import { zhCN } from 'date-fns/locale'
 
+const emit = defineEmits<{
+  syncComplete: []
+}>()
+
 const syncStore = useGroupSyncStore()
 const showAlertDialog = ref(false)
 const retrying = ref(false)
@@ -156,6 +160,9 @@ async function handleSyncNow() {
     ElMessage.success(
       `同步完成！总计 ${result.totalCount} 个群组，成功 ${result.successCount} 个，失败 ${result.failureCount} 个`
     )
+
+    // 通知父组件刷新列表
+    emit('syncComplete')
   } catch (error: any) {
     if (error !== 'cancel') {
       ElMessage.error(error.message || '同步失败')
@@ -175,8 +182,13 @@ async function handleRetryFailed() {
     if (result.failureCount === 0) {
       showAlertDialog.value = false
     }
+
+    // 通知父组件刷新列表
+    emit('syncComplete')
   } catch (error: any) {
-    ElMessage.error(error.message || '重试失败')
+    if (error !== 'cancel') {
+      ElMessage.error(error.message || '重试失败')
+    }
   } finally {
     retrying.value = false
   }
