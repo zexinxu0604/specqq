@@ -60,8 +60,8 @@ public class GroupSyncServiceImpl implements GroupSyncService {
                 groupChat.setClient(client);
             }
 
-            log.debug("获取客户端适配器: protocolType={}", client.getProtocolType());
-            ClientAdapter adapter = clientAdapterFactory.getAdapter(client.getProtocolType());
+            log.debug("获取客户端适配器: clientType={}", client.getClientType());
+            ClientAdapter adapter = clientAdapterFactory.getAdapter(client.getClientType());
             if (!(adapter instanceof NapCatAdapter napCatAdapter)) {
                 throw new IllegalStateException("Only NapCat adapter is supported for sync");
             }
@@ -232,8 +232,8 @@ public class GroupSyncServiceImpl implements GroupSyncService {
      * 从适配器获取群组列表
      */
     private List<Map<String, Object>> fetchGroupListFromAdapter(ChatClient client, Long clientId) {
-        log.debug("获取客户端适配器用于群组发现: protocolType={}", client.getProtocolType());
-        ClientAdapter adapter = clientAdapterFactory.getAdapter(client.getProtocolType());
+        log.debug("获取客户端适配器用于群组发现: clientType={}", client.getClientType());
+        ClientAdapter adapter = clientAdapterFactory.getAdapter(client.getClientType());
         if (!(adapter instanceof NapCatAdapter napCatAdapter)) {
             throw new IllegalStateException("Only NapCat adapter is supported for discovery");
         }
