@@ -390,7 +390,7 @@ public class NapCatAdapter implements ClientAdapter {
         response.setId(requestId);
         response.setStatus((String) responseMap.getOrDefault("status", "unknown"));
         response.setRetcode(((Number) responseMap.getOrDefault("retcode", -1)).intValue());
-        response.setData((Map<String, Object>) responseMap.get("data"));
+        response.setRawData(responseMap.get("data"));
         response.setMessage((String) responseMap.get("message"));
         response.setExecutionTimeMs(executionTime);
 

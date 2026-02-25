@@ -42,7 +42,7 @@ public class ApiCallResponseDTO {
      * Response data payload (varies by API action)
      */
     @JsonProperty("data")
-    private Map<String, Object> data;
+    private Object rawData;
 
     /**
      * Error message (if status = "failed")
@@ -137,12 +137,24 @@ public class ApiCallResponseDTO {
         this.retcode = retcode;
     }
 
+    @SuppressWarnings("unchecked")
     public Map<String, Object> getData() {
-        return data;
+        if (rawData instanceof Map) {
+            return (Map<String, Object>) rawData;
+        }
+        return null;
     }
 
     public void setData(Map<String, Object> data) {
-        this.data = data;
+        this.rawData = data;
+    }
+
+    public Object getRawData() {
+        return rawData;
+    }
+
+    public void setRawData(Object rawData) {
+        this.rawData = rawData;
     }
 
     public String getMessage() {

@@ -17,7 +17,7 @@ app.post('/get_group_list', (req, res) => {
   res.json({
     status: 'ok',
     retcode: 0,
-    data: { groups: mockGroups }
+    data: mockGroups
   });
 });
 
@@ -57,7 +57,7 @@ app.post('/simulate_group_increase', (req, res) => {
   });
 });
 
-const PORT = 3100;
+const PORT = 3002;
 app.listen(PORT, () => {
   console.log(`[NapCat Mock Server] Running on http://localhost:${PORT}`);
   console.log('Available endpoints:');

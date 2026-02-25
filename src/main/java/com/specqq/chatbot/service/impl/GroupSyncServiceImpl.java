@@ -248,7 +248,8 @@ public class GroupSyncServiceImpl implements GroupSyncService {
             return null;
         }
 
-        List<Map<String, Object>> groupList = (List<Map<String, Object>>) response.getData().get("groups");
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> groupList = (List<Map<String, Object>>) response.getRawData();
         log.debug("NapCat返回群组列表: totalCount={}", groupList != null ? groupList.size() : 0);
 
         if (groupList == null || groupList.isEmpty()) {
